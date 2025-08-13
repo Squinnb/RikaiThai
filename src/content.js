@@ -23,11 +23,28 @@ const thaiDict = {
   'ห่วง': 'worry/concern',
   'กัมพูชา': 'Cambodia',
   'ประชิด': 'close to/adjacent',
-  'ชายแดน': 'border'
+  'ชายแดน': 'border',
+  'ผู้บรรยาย': 'narrator',
+  'โลก': 'world',
+  'ช็อค': 'shock',
+  'เลิศศิลา': 'Lerdsila (Thai fighter’s name)',
+  'เจอ': 'meet/encounter',
+  'มวย': 'boxing/fight',
+  'อเมริกา': 'America',
+  'จึง': 'therefore/so',
+  'ใช้': 'use',
+  'มวยไทย': 'Muay Thai',
+  'ชุดใหญ่': 'full force/big set',
+  'จน': 'until/to the point',
+  'นอน': 'sleep/lie down',
+  'คอมเม้นท์': 'comment',
+  'ต่างชาติ': 'foreigner/international',
+  'เดือด': 'angry/heated'
 };
 
 const tooltip = document.createElement('div');
 let segmenter = null;
+let currentWord = null;
 
 // Check if Intl.Segmenter is supported
 const initSegmenter = () => {
@@ -48,8 +65,6 @@ const initSegmenter = () => {
 
 // Fallback segmentation for unsupported browsers
 const fallbackSegment = (text) => {
-  // Simple fallback: split by spaces and common punctuation
-  // Not ideal for Thai, but better than nothing
   return text.split(/[\s\u0020\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]+/).filter(word => word.length > 0);
 };
 
@@ -76,7 +91,7 @@ const initToolTip = () => {
   tooltip.style.fontSize = '16px';
   tooltip.style.fontFamily = 'Arial, sans-serif';
   tooltip.style.fontWeight = 'normal';
-  tooltip.style.zIndex = '2147483647'; // Maximum z-index
+  tooltip.style.zIndex = '2147483647';
   tooltip.style.display = 'none';
   tooltip.style.pointerEvents = 'none';
   tooltip.style.maxWidth = '300px';
@@ -85,51 +100,37 @@ const initToolTip = () => {
   tooltip.style.lineHeight = '1.4';
   tooltip.id = 'thai-dict-tooltip';
   
-  // Make sure it's added to body
   document.body.appendChild(tooltip);
-  console.log("Tooltip created and added to body:", tooltip);
+  console.log("Tooltip created and added to body");
 };
 
-// Get Thai text around cursor position (improved compatibility)
+// Get text around cursor - simplified version
 const getTextAroundCursor = (event) => {
   try {
-    // Try modern API first
     let pos = null;
     if (document.caretPositionFromPoint) {
       pos = document.caretPositionFromPoint(event.clientX, event.clientY);
     } else if (document.caretRangeFromPoint) {
-      // Webkit fallback
       const range = document.caretRangeFromPoint(event.clientX, event.clientY);
       if (range) {
-        pos = {
-          offsetNode: range.startContainer,
-          offset: range.startOffset
-        };
+        pos = { offsetNode: range.startContainer, offset: range.startOffset };
       }
     }
 
     if (!pos || !pos.offsetNode) return null;
 
-    // Make sure we're in a text node
     let textNode = pos.offsetNode;
     if (textNode.nodeType !== 3) {
-      // If not a text node, try to find a text node child
-      const walker = document.createTreeWalker(
-        textNode,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false
-      );
+      // Find text node
+      const walker = document.createTreeWalker(textNode, NodeFilter.SHOW_TEXT);
       textNode = walker.nextNode();
       if (!textNode) return null;
-      pos.offset = 0; // Reset offset for new node
     }
 
     const text = textNode.nodeValue;
     if (!text) return null;
 
     const offset = Math.min(pos.offset, text.length);
-    // Get more context around the cursor
     const contextStart = Math.max(0, offset - 50);
     const contextEnd = Math.min(text.length, offset + 50);
     const context = text.slice(contextStart, contextEnd);
@@ -137,7 +138,8 @@ const getTextAroundCursor = (event) => {
     return {
       context,
       relativeOffset: offset - contextStart,
-      textNode
+      textNode,
+      absoluteOffset: offset
     };
   } catch (error) {
     console.error("Error getting text around cursor:", error);
@@ -145,7 +147,7 @@ const getTextAroundCursor = (event) => {
   }
 };
 
-// Find word at specific position in segmented text
+// Find word at cursor position
 const findWordAtPosition = (segments, context, relativeOffset) => {
   let currentPos = 0;
   
@@ -156,7 +158,11 @@ const findWordAtPosition = (segments, context, relativeOffset) => {
     const wordEnd = wordStart + word.length;
     
     if (relativeOffset >= wordStart && relativeOffset <= wordEnd) {
-      return word.trim();
+      return {
+        word: word.trim(),
+        start: wordStart,
+        end: wordEnd
+      };
     }
     
     currentPos = wordEnd;
@@ -165,26 +171,43 @@ const findWordAtPosition = (segments, context, relativeOffset) => {
   return null;
 };
 
-// Handle mouse movement (improved debugging and compatibility)
+// Simple highlighting using CSS outline
+const highlightWord = (element, word) => {
+  element.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+  element.style.outline = '2px solid #FFD700';
+  element.style.outlineOffset = '1px';
+  console.log("element: ", element)
+  console.log("word: ", word)
+};
+
+const removeHighlight = (element) => {
+  if (element) {
+    element.style.backgroundColor = '';
+    element.style.outline = '';
+    element.style.outlineOffset = '';
+  }
+};
+
+let highlightedElement = null;
+
+// Handle mouse movement - simplified
 const mouseMove = (event) => {
-  // Add debug logging to see if function is called
-  console.log("mouseMove called at:", event.clientX, event.clientY);
+  console.log("mouseMove called");
   
   const textData = getTextAroundCursor(event);
   if (!textData) {
-    console.log("No text data found");
-    tooltip.style.display = 'none';
+    console.log("No text data");
+    hideTooltip();
     return;
   }
 
-  const { context, relativeOffset, textNode } = textData;
-  console.log("Context found:", context.substring(0, 20) + "...", "Offset:", relativeOffset);
+  const { context, relativeOffset } = textData;
   
-  // Check if context contains Thai characters
+  // Check for Thai characters
   const thaiRegex = /[\u0E00-\u0E7F]/;
   if (!thaiRegex.test(context)) {
-    console.log("No Thai characters found in context");
-    tooltip.style.display = 'none';
+    console.log("No Thai text");
+    hideTooltip();
     return;
   }
 
@@ -192,35 +215,54 @@ const mouseMove = (event) => {
     const segments = segmentText(context);
     console.log("Segments:", segments);
     
-    const hoveredWord = findWordAtPosition(segments, context, relativeOffset);
-    console.log("Hovered word:", hoveredWord);
-    
-    if (!hoveredWord) {
-      tooltip.style.display = 'none';
+    const result = findWordAtPosition(segments, context, relativeOffset);
+    if (!result) {
+      console.log("No word found at position");
+      hideTooltip();
       return;
     }
 
-    // Check if we have a translation for this word
+    const hoveredWord = result.word;
+    console.log("Hovered word:", hoveredWord);
+
+    // Check if we have translation
     const translation = thaiDict[hoveredWord];
     if (!translation) {
-      console.log("No translation found for:", hoveredWord);
-      tooltip.style.display = 'none';
+      console.log("No translation for:", hoveredWord);
+      hideTooltip();
       return;
     }
 
+    // Don't update if same word
+    if (currentWord === hoveredWord) {
+      return;
+    }
+
+    currentWord = hoveredWord;
     console.log("Showing translation:", hoveredWord, "->", translation);
 
-    // Show tooltip with enhanced styling and positioning
+    // Remove previous highlight
+    if (highlightedElement) {
+      removeHighlight(highlightedElement);
+    }
+
+    // Try to highlight current element
+    const element = event.target;
+    if (element && element.nodeType === 1) {
+      highlightWord(element, hoveredWord);
+      highlightedElement = element;
+    }
+
+    // Show tooltip
     tooltip.innerHTML = `
       <div style="font-weight: bold; color: #4CAF50; font-size: 18px;">${hoveredWord}</div>
       <div style="margin-top: 4px; color: #ffffff; font-size: 14px;">${translation}</div>
     `;
     
-    // Better positioning to avoid edge cases
+    // Position tooltip
     let tooltipX = event.clientX + 15;
     let tooltipY = event.clientY - 60;
     
-    // Adjust if tooltip would go off screen
     if (tooltipX + 250 > window.innerWidth) {
       tooltipX = event.clientX - 250;
     }
@@ -231,65 +273,46 @@ const mouseMove = (event) => {
     tooltip.style.left = `${tooltipX}px`;
     tooltip.style.top = `${tooltipY}px`;
     tooltip.style.display = 'block';
-    tooltip.style.visibility = 'visible';
-    tooltip.style.opacity = '1';
-    
-    console.log("Tooltip positioned at:", tooltipX, tooltipY);
-    console.log("Tooltip display:", tooltip.style.display);
-    console.log("Tooltip visibility:", tooltip.style.visibility);
     
   } catch (error) {
-    console.error("Error processing text:", error);
-    tooltip.style.display = 'none';
+    console.error("Error in mouseMove:", error);
+    hideTooltip();
   }
 };
 
-// Hide tooltip when mouse leaves
-const mouseLeave = () => {
+const hideTooltip = () => {
   tooltip.style.display = 'none';
+  if (highlightedElement) {
+    removeHighlight(highlightedElement);
+    highlightedElement = null;
+  }
+  currentWord = null;
 };
 
 // Initialize everything
 const init = () => {
-  console.log("Initializing Thai Dictionary Extension...");
+  console.log("Initializing...");
   
   const segmenterSupported = initSegmenter();
-  
   if (!segmenterSupported) {
-    console.warn("Using fallback segmentation - word detection may be less accurate for Thai text");
+    console.warn("Using fallback segmentation");
   }
   
   initToolTip();
   
-  // Add event listeners with debugging
-  console.log("Adding event listeners...");
-  document.addEventListener('mousemove', mouseMove, true); // Use capture phase
-  document.addEventListener('mouseleave', mouseLeave);
+  // Add event listeners
+  document.addEventListener('mousemove', mouseMove, true);
+  document.addEventListener('mouseleave', hideTooltip);
   
-  // Test basic mouse event
-  let testCount = 0;
-  const testMouseMove = (e) => {
-    if (testCount < 3) {
-      console.log("Basic mouse move detected:", e.clientX, e.clientY);
-      testCount++;
-    }
-  };
-  document.addEventListener('mousemove', testMouseMove);
-  
-  // Test the segmenter
+  // Test
   const testText = 'ไปไหนดี กินข้าวแล้วหรือยัง';
   const testSegments = segmentText(testText);
   console.log("Test segmentation:", testSegments);
   
-  // Test tooltip visibility
-  console.log("Testing tooltip creation...");
-  console.log("Tooltip element:", tooltip);
-  console.log("Tooltip parent:", tooltip.parentNode);
-  
   console.log("Initialization complete!");
 };
 
-// Initialize when DOM is ready
+// Initialize when ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
