@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "RikaiThai",
     "version": "0.1",
-    "description": "Hover over Thai text to translate",
+    "description": "Hover over Thai text to translate กินข้าวไหน",
     "permissions": ["scripting", "activeTab"],
     "host_permissions": ["<all_urls>"],
     "action": {

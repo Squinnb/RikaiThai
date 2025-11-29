@@ -171,24 +171,63 @@ const findWordAtPosition = (segments, context, relativeOffset) => {
   return null;
 };
 
-// Simple highlighting using CSS outline
-const highlightWord = (element, word) => {
-  element.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
-  element.style.outline = '2px solid #FFD700';
-  element.style.outlineOffset = '1px';
-  console.log("element: ", element)
-  console.log("word: ", word)
+let originalTextNode = null; // to store and restore the original text
+let originalTextContent = '';
+let highlightSpan = null;
+let beforeNode = null;  // NEW: Store explicit refs
+let afterNode = null;
+
+// Helper: wraps the word in a span with styles, only if not already wrapped
+const highlightWord = (textNode, word, wordStart, wordEnd) => {
+  removeHighlight(); // Clean up before highlighting
+  // Only work on real text nodes
+  if (textNode.nodeType !== 3) return;
+  const text = textNode.nodeValue;
+  // Confirm match at position to avoid accidental highlight
+  if (text.slice(wordStart, wordEnd) !== word) return;
+
+  // Create span
+  const span = document.createElement('span');
+  span.textContent = word;
+  span.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+  span.style.outline = '2px solid #FFD700';
+  span.style.outlineOffset = '1px';
+  span.style.borderRadius = '4px';
+  span.className = 'thai-highlight-word';
+
+  // Split text node into 3 parts
+  beforeNode = document.createTextNode(text.slice(0, wordStart));
+  afterNode = document.createTextNode(text.slice(wordEnd));
+
+  // Insert into DOM
+  const parent = textNode.parentNode;
+  originalTextNode = textNode;
+  originalTextContent = text;
+  highlightSpan = span;
+  parent.insertBefore(beforeNode, textNode);
+  parent.insertBefore(span, textNode);
+  parent.insertBefore(afterNode, textNode);
+  parent.removeChild(textNode);
 };
 
-const removeHighlight = (element) => {
-  if (element) {
-    element.style.backgroundColor = '';
-    element.style.outline = '';
-    element.style.outlineOffset = '';
+// Remove highlight by restoring original text
+const removeHighlight = () => {
+  if (highlightSpan && originalTextNode && originalTextContent !== '') {
+    const parent = highlightSpan.parentNode;
+    if (!parent) return;
+    // Remove ONLY the nodes we added
+    if (highlightSpan.parentNode === parent) parent.removeChild(highlightSpan);
+    if (beforeNode && beforeNode.parentNode === parent) parent.removeChild(beforeNode);
+    if (afterNode && afterNode.parentNode === parent) parent.removeChild(afterNode);
+    parent.insertBefore(originalTextNode, parent.firstChild ? afterNode || parent.firstChild : null);
+    originalTextNode.nodeValue = originalTextContent; // restore in-place
   }
+  originalTextNode = null;
+  originalTextContent = '';
+  highlightSpan = null;
+  beforeNode = null;
+  afterNode = null;
 };
-
-let highlightedElement = null;
 
 // Handle mouse movement - simplified
 const mouseMove = (event) => {
@@ -201,7 +240,7 @@ const mouseMove = (event) => {
     return;
   }
 
-  const { context, relativeOffset } = textData;
+  const { context, relativeOffset, textNode, absoluteOffset } = textData;
   
   // Check for Thai characters
   const thaiRegex = /[\u0E00-\u0E7F]/;
@@ -223,6 +262,8 @@ const mouseMove = (event) => {
     }
 
     const hoveredWord = result.word;
+    const wordStart = result.start;
+    const wordEnd = result.end;
     console.log("Hovered word:", hoveredWord);
 
     // Check if we have translation
@@ -242,16 +283,19 @@ const mouseMove = (event) => {
     console.log("Showing translation:", hoveredWord, "->", translation);
 
     // Remove previous highlight
-    if (highlightedElement) {
-      removeHighlight(highlightedElement);
-    }
+    removeHighlight();
 
-    // Try to highlight current element
-    const element = event.target;
-    if (element && element.nodeType === 1) {
-      highlightWord(element, hoveredWord);
-      highlightedElement = element;
-    }
+    // --- Adjust the highlight indices to text node ---
+    // wordStart and wordEnd are relative to 'context'. 'context' is a window into textNode.nodeValue:
+    // contextStart in getTextAroundCursor:
+    //   const contextStart = Math.max(0, offset - 50);
+    // Use same calculations here:
+    const offset = Math.min(absoluteOffset, textNode.nodeValue.length);
+    const contextStart = Math.max(0, offset - 50);
+    const absoluteWordStart = contextStart + wordStart;
+    const absoluteWordEnd = contextStart + wordEnd;
+    // Highlight just the word in the text node
+    highlightWord(textNode, hoveredWord, absoluteWordStart, absoluteWordEnd);
 
     // Show tooltip
     tooltip.innerHTML = `
@@ -282,10 +326,7 @@ const mouseMove = (event) => {
 
 const hideTooltip = () => {
   tooltip.style.display = 'none';
-  if (highlightedElement) {
-    removeHighlight(highlightedElement);
-    highlightedElement = null;
-  }
+  removeHighlight();
   currentWord = null;
 };
 
