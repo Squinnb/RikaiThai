@@ -80,7 +80,14 @@ const segmentText = (text) => {
   }
 };
 
-// Create tooltip (with better styling and z-index)
+// --- Popup hover management variables ---
+let popupHovered = false;
+let wordHovered = false;
+let hidePopupTimeout = null;
+const POPUP_OFFSET_X = 18; // Slightly increased bias, safer for text height
+const POPUP_OFFSET_Y = 20;
+
+// --- Updated tooltip CSS: pointer events ON ---
 const initToolTip = () => {
   tooltip.style.position = 'fixed';
   tooltip.style.background = 'rgba(0, 0, 0, 0.95)';
@@ -93,16 +100,33 @@ const initToolTip = () => {
   tooltip.style.fontWeight = 'normal';
   tooltip.style.zIndex = '2147483647';
   tooltip.style.display = 'none';
-  tooltip.style.pointerEvents = 'none';
+  tooltip.style.pointerEvents = 'auto';
   tooltip.style.maxWidth = '300px';
   tooltip.style.wordWrap = 'break-word';
   tooltip.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
   tooltip.style.lineHeight = '1.4';
   tooltip.id = 'thai-dict-tooltip';
-  
   document.body.appendChild(tooltip);
-  console.log("Tooltip created and added to body");
+  // --- Add hover listeners to tooltip ---
+  tooltip.addEventListener('mouseenter', () => {
+    popupHovered = true;
+    if (hidePopupTimeout) clearTimeout(hidePopupTimeout);
+  });
+  tooltip.addEventListener('mouseleave', () => {
+    popupHovered = false;
+    delayedHideTooltip();
+  });
 };
+
+// --- Utility for delayed hide ---
+function delayedHideTooltip() {
+  if (hidePopupTimeout) clearTimeout(hidePopupTimeout);
+  hidePopupTimeout = setTimeout(() => {
+    if (!popupHovered && !wordHovered) {
+      hideTooltip();
+    }
+  }, 120);
+}
 
 // Get text around cursor - simplified version
 const getTextAroundCursor = (event) => {
@@ -177,16 +201,12 @@ let highlightSpan = null;
 let beforeNode = null;  // NEW: Store explicit refs
 let afterNode = null;
 
-// Helper: wraps the word in a span with styles, only if not already wrapped
+// --- Highlighted span creation (word) ---
 const highlightWord = (textNode, word, wordStart, wordEnd) => {
-  removeHighlight(); // Clean up before highlighting
-  // Only work on real text nodes
+  removeHighlight();
   if (textNode.nodeType !== 3) return;
   const text = textNode.nodeValue;
-  // Confirm match at position to avoid accidental highlight
   if (text.slice(wordStart, wordEnd) !== word) return;
-
-  // Create span
   const span = document.createElement('span');
   span.textContent = word;
   span.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
@@ -194,12 +214,17 @@ const highlightWord = (textNode, word, wordStart, wordEnd) => {
   span.style.outlineOffset = '1px';
   span.style.borderRadius = '4px';
   span.className = 'thai-highlight-word';
-
-  // Split text node into 3 parts
+  // --- Make highlighted word interactive ---
+  span.addEventListener('mouseenter', () => {
+    wordHovered = true;
+    if (hidePopupTimeout) clearTimeout(hidePopupTimeout);
+  });
+  span.addEventListener('mouseleave', () => {
+    wordHovered = false;
+    delayedHideTooltip();
+  });
   beforeNode = document.createTextNode(text.slice(0, wordStart));
   afterNode = document.createTextNode(text.slice(wordEnd));
-
-  // Insert into DOM
   const parent = textNode.parentNode;
   originalTextNode = textNode;
   originalTextContent = text;
@@ -229,101 +254,61 @@ const removeHighlight = () => {
   afterNode = null;
 };
 
-// Handle mouse movement - simplified
+// --- Main mouseMove logic, use current cursorRikaikun style offset positioning ---
 const mouseMove = (event) => {
-  console.log("mouseMove called");
-  
   const textData = getTextAroundCursor(event);
-  if (!textData) {
-    console.log("No text data");
-    hideTooltip();
-    return;
-  }
-
+  if (!textData) { hideTooltip(); return; }
   const { context, relativeOffset, textNode, absoluteOffset } = textData;
-  
-  // Check for Thai characters
   const thaiRegex = /[\u0E00-\u0E7F]/;
-  if (!thaiRegex.test(context)) {
-    console.log("No Thai text");
-    hideTooltip();
-    return;
-  }
-
+  if (!thaiRegex.test(context)) { hideTooltip(); return; }
   try {
     const segments = segmentText(context);
-    console.log("Segments:", segments);
-    
     const result = findWordAtPosition(segments, context, relativeOffset);
-    if (!result) {
-      console.log("No word found at position");
-      hideTooltip();
-      return;
-    }
-
+    if (!result) { hideTooltip(); return; }
     const hoveredWord = result.word;
     const wordStart = result.start;
     const wordEnd = result.end;
-    console.log("Hovered word:", hoveredWord);
-
-    // Check if we have translation
     const translation = thaiDict[hoveredWord];
-    if (!translation) {
-      console.log("No translation for:", hoveredWord);
-      hideTooltip();
-      return;
-    }
-
-    // Don't update if same word
-    if (currentWord === hoveredWord) {
-      return;
-    }
-
+    if (!translation) { hideTooltip(); return; }
+    if (currentWord === hoveredWord) { return; }
     currentWord = hoveredWord;
-    console.log("Showing translation:", hoveredWord, "->", translation);
-
-    // Remove previous highlight
     removeHighlight();
-
-    // --- Adjust the highlight indices to text node ---
-    // wordStart and wordEnd are relative to 'context'. 'context' is a window into textNode.nodeValue:
-    // contextStart in getTextAroundCursor:
-    //   const contextStart = Math.max(0, offset - 50);
-    // Use same calculations here:
     const offset = Math.min(absoluteOffset, textNode.nodeValue.length);
     const contextStart = Math.max(0, offset - 50);
     const absoluteWordStart = contextStart + wordStart;
     const absoluteWordEnd = contextStart + wordEnd;
-    // Highlight just the word in the text node
     highlightWord(textNode, hoveredWord, absoluteWordStart, absoluteWordEnd);
-
-    // Show tooltip
     tooltip.innerHTML = `
       <div style="font-weight: bold; color: #4CAF50; font-size: 18px;">${hoveredWord}</div>
       <div style="margin-top: 4px; color: #ffffff; font-size: 14px;">${translation}</div>
     `;
-    
-    // Position tooltip
-    let tooltipX = event.clientX + 15;
-    let tooltipY = event.clientY - 60;
-    
-    if (tooltipX + 250 > window.innerWidth) {
-      tooltipX = event.clientX - 250;
-    }
-    if (tooltipY < 0) {
-      tooltipY = event.clientY + 20;
-    }
-    
-    tooltip.style.left = `${tooltipX}px`;
-    tooltip.style.top = `${tooltipY}px`;
+    // --- Rikaikun-style popup positioning ---
     tooltip.style.display = 'block';
-    
-  } catch (error) {
-    console.error("Error in mouseMove:", error);
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.left = '0px';
+    tooltip.style.top = '0px';
+    const popupWidth = tooltip.offsetWidth;
+    const popupHeight = tooltip.offsetHeight;
+    let popupX = event.clientX + POPUP_OFFSET_X;
+    let popupY = event.clientY + POPUP_OFFSET_Y;
+    if (popupX + popupWidth > window.innerWidth - 8) {
+      popupX = window.innerWidth - popupWidth - 8;
+    }
+    if (popupY + popupHeight > window.innerHeight - 8) {
+      popupY = event.clientY - popupHeight - POPUP_OFFSET_Y;
+      if (popupY < 8) popupY = 8;
+    }
+    if (popupX < 8) popupX = 8;
+    if (popupY < 8) popupY = 8;
+    tooltip.style.left = `${popupX}px`;
+    tooltip.style.top = `${popupY}px`;
+    tooltip.style.visibility = 'visible';
+  } catch {
     hideTooltip();
   }
 };
 
+// --- Hide logic now handled only when both not hovered ---
 const hideTooltip = () => {
   tooltip.style.display = 'none';
   removeHighlight();
