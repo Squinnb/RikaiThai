@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+pythaidict/.venv
+pythaidict/.DS_Store
+pythaidict/.mypy_cache
 
 # Editor directories and files
 .vscode/*
