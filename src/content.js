@@ -56,8 +56,8 @@ function highlightWord(textNode, word, start, end) {
   const span = document.createElement("span");
   span.textContent = word;
   span.className = "thai-highlight-word";
-  span.style.backgroundColor = "rgba(255, 255, 0, 0.3)";
-  span.style.outline = "2px solid #FFD700";
+  span.style.backgroundColor = "rgba(98, 172, 237, 0.75)";
+  span.style.outline = "1px solidrgb(0, 31, 49)";
   span.style.outlineOffset = "1px";
   span.style.borderRadius = "4px";
 
@@ -157,7 +157,7 @@ const initToolTip = () => {
   tooltip.style.color = 'white';
   tooltip.style.border = '2px solid #4CAF50';
   tooltip.style.borderRadius = '6px';
-  tooltip.style.padding = '8px 12px';
+  tooltip.style.padding = '4px 6px';
   tooltip.style.fontSize = '18px';
   // Keep fontFamily you had (you fixed the actual font earlier)
   tooltip.style.fontFamily = "thongterm, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial";
@@ -389,7 +389,7 @@ const mouseMove = (event) => {
 
   // Build tooltip content using fields from your dictionary entry
   const paiboon = entry.romanization_paiboon || "";
-  const royal = entry.romanization_royal || "";
+
   const defs = (entry.definitions && entry.definitions.length) ? entry.definitions : [];
   const defHtml = defs.map(d => `<div style="margin-top:6px;">${escapeHtml(d)}</div>`).join("");
 
@@ -397,7 +397,6 @@ const mouseMove = (event) => {
     <div style="font-weight:bold;color:#4CAF50;font-size:18px;">${escapeHtml(hoveredWord)}</div>
     <div style="margin-top:6px;color:#ffffff;font-size:13px;">
       <div style="opacity:0.95">${escapeHtml(paiboon)}</div>
-      <div style="opacity:0.85;font-size:12px;">${escapeHtml(royal)}</div>
     </div>
     ${defHtml}
   `;
