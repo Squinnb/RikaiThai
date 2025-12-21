@@ -88,25 +88,24 @@ function caretInfo(e) {
    RIKAIKUN MATCHER (FIXED)
    =============================== */
 
-function findWord(text, cursor) {
-  let best = null;
-
+  function findWord(text, cursor) {
   for (let start = Math.max(0, cursor - MAX_WORD_LEN); start <= cursor; start++) {
     for (let len = MAX_WORD_LEN; len >= 2; len--) {
       const end = start + len;
-      if (cursor < start || cursor >= end) continue;
+
+      if (cursor < start || cursor > end) continue;
+      if (start < cursor && end > cursor + 1) continue;
 
       const word = text.slice(start, end);
       const entry = DICT[word];
       if (!entry) continue;
 
-      best = { word, entry, start, end };
-      return best; // longest-first
+      return { word, entry, start, end };
     }
   }
-
   return null;
 }
+  
 
 /* ===============================
    TOOLTIP UI (POS GROUPED)
