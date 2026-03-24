@@ -67,41 +67,59 @@ function clearHighlight() {
    =============================== */
 
 function caretInfo(e) {
-  let pos = null;
+  let node = null, offset = 0;
+
+  // Primary method
   if (document.caretPositionFromPoint) {
-    pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-  } else if (document.caretRangeFromPoint) {
-    const r = document.caretRangeFromPoint(e.clientX, e.clientY);
-    if (r) pos = { offsetNode: r.startContainer, offset: r.startOffset };
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (pos && pos.offsetNode.nodeType === 3) {
+      node = pos.offsetNode;
+      offset = pos.offset;
+    }
   }
 
-  if (!pos || pos.offsetNode.nodeType !== 3) return null;
+  // Fallback: caretRangeFromPoint (Chrome's native method)
+  if (!node && document.caretRangeFromPoint) {
+    const r = document.caretRangeFromPoint(e.clientX, e.clientY);
+    if (r && r.startContainer.nodeType === 3) {
+      node = r.startContainer;
+      offset = r.startOffset;
+    }
+  }
 
-  return {
-    node: pos.offsetNode,
-    text: pos.offsetNode.nodeValue,
-    offset: pos.offset
-  };
+  // Last resort: walk into the element under cursor and find a Thai text node
+  if (!node) {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (el) {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let textNode;
+      while ((textNode = walker.nextNode())) {
+        if (/[\u0E00-\u0E7F]/.test(textNode.nodeValue)) {
+          node = textNode;
+          offset = 0; // imprecise but better than nothing
+          break;
+        }
+      }
+    }
+  }
+
+  if (!node || !/[\u0E00-\u0E7F]/.test(node.nodeValue)) return null;
+
+  return { node, text: node.nodeValue, offset };
 }
 
 /* ===============================
    RIKAIKUN MATCHER (FIXED)
    =============================== */
 
-  function findWord(text, cursor) {
-  for (let start = Math.max(0, cursor - MAX_WORD_LEN); start <= cursor; start++) {
-    for (let len = MAX_WORD_LEN; len >= 2; len--) {
-      const end = start + len;
-
-      if (cursor < start || cursor > end) continue;
-      if (start < cursor && end > cursor + 1) continue;
-
-      const word = text.slice(start, end);
-      const entry = DICT[word];
-      if (!entry) continue;
-
-      return { word, entry, start, end };
-    }
+function findWord(text, cursor) {
+  for (let len = MAX_WORD_LEN; len >= 2; len--) {
+    const end = cursor + len;
+    if (end > text.length) continue;
+    
+    const word = text.slice(cursor, end);
+    const entry = DICT[word];
+    if (entry) return { word, entry, start: cursor, end };
   }
   return null;
 }
@@ -125,7 +143,7 @@ function renderTooltip(word, entry) {
   `;
 
   html += `
-    <div style="margin-top:6px;">
+    <div style="margin-top:6px; font-size:12px; color:#aaa;">
       ${entry.pos.join(", ")}
     </div>
   `;
