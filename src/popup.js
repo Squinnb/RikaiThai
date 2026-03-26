@@ -1,4 +1,4 @@
-const THEMES = ["Thailand", "midnight", "high-contrast"];
+const THEMES = ["Thai Flag", "midnight", "high-contrast"];
 
 function setActive(theme) {
   document.querySelectorAll(".theme-btn").forEach(btn => {
@@ -6,22 +6,22 @@ function setActive(theme) {
   });
 }
 
-// Load current theme and mark active
-chrome.storage.sync.get("theme", ({ theme }) => {
+// Load saved state
+chrome.storage.sync.get(["theme", "enabled"], ({ theme, enabled }) => {
   if (theme) setActive(theme);
+  document.getElementById("enableToggle").checked = enabled !== false; // default on
 });
 
-
+// Theme buttons
 document.querySelectorAll(".theme-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const theme = btn.dataset.theme;
-    console.log('theme selected: ', theme)
     chrome.storage.sync.set({ theme });
     setActive(theme);
-
-    // Notify content script to update
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { type: "SET_THEME", theme });
-    });
   });
+});
+
+// Enable/disable toggle
+document.getElementById("enableToggle").addEventListener("change", (e) => {
+  chrome.storage.sync.set({ enabled: e.target.checked });
 });

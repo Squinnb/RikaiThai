@@ -206,8 +206,22 @@ function hasDirectThaiText(el) {
   return false;
 }
 
+let isEnabled = true;
+
+chrome.storage.sync.get("enabled", ({ enabled }) => {
+  isEnabled = enabled !== false;
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.theme) applyTheme(changes.theme.newValue);
+  if (changes.enabled) {
+    isEnabled = changes.enabled.newValue;
+    if (!isEnabled) clearHighlight();
+  }
+});
+
 function onMove(e) {
-  if (!DICT) return;
+  if (!DICT || !isEnabled) return;
 
   // Quick bail: no Thai text in the element under cursor
   const el = document.elementFromPoint(e.clientX, e.clientY);
