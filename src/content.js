@@ -10,6 +10,32 @@ let MAX_WORD_LEN = 0;
 
 let activeMatch = null; // { start, end, word }
 
+const THEMES = {
+  Thailand: {
+    background: "#fdf6e3",
+    border: "#cb4b16",
+    word: "#268bd2",
+    pos: "#93a1a1",
+    text: "#657b83",
+  },
+  midnight: {
+    background: "#1a1b2e",
+    border: "#7c6af7",
+    word: "#7c6af7",
+    pos: "#7a7a9a",
+    text: "#c8c8e8",
+  },
+  "high-contrast": {
+    background: "#000000",
+    border: "#ffff00",
+    word: "#ffff00",
+    pos: "#aaaaaa",
+    text: "#ffffff",
+  },
+};
+
+let currentTheme = THEMES["midnight"]; // default
+
 /* ===============================
    TOOLTIP
    =============================== */
@@ -17,15 +43,33 @@ let activeMatch = null; // { start, end, word }
 const tooltip = document.createElement("div");
 tooltip.style.position = "fixed";
 tooltip.style.zIndex = "2147483647";
-tooltip.style.background = "rgba(0,0,0,0.95)";
-tooltip.style.color = "#fff";
-tooltip.style.border = "2px solid #4CAF50";
 tooltip.style.borderRadius = "6px";
 tooltip.style.padding = "8px";
 tooltip.style.fontSize = "16px";
 tooltip.style.display = "none";
 tooltip.style.maxWidth = "360px";
 document.body.appendChild(tooltip);
+
+function applyTheme(t) {
+  const theme = THEMES[t] || THEMES["midnight"];
+  currentTheme = theme;
+  tooltip.style.background = theme.background;
+  tooltip.style.border = `2px solid ${theme.border}`;
+  tooltip.style.color = theme.text;
+}
+
+// Load saved theme
+chrome.storage.sync.get("theme", ({ theme }) => {
+  applyTheme(theme || "midnight");
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+  console.log("storage changed", changes);
+  if (changes.theme) {
+    applyTheme(changes.theme.newValue);
+  }
+});
+
 
 /* ===============================
    OVERLAY HIGHLIGHT
@@ -130,31 +174,21 @@ function findWord(text, cursor) {
    =============================== */
 
 function renderTooltip(word, entry) {
-
-  console.log("entry: ", entry);
-  console.log("word: ", word);
   let html = `
-    <div style="font-size:28px;font-weight:bold;color:#4CAF50;">
+    <div style="font-size:28px;font-weight:bold;color:${currentTheme.word};">
       ${word}
     </div>
     <div style="opacity:0.85;margin-bottom:6px;">
       ${entry.romanization_paiboon || ""}
     </div>
-  `;
-
-  html += `
-    <div style="margin-top:6px; font-size:12px; color:#aaa;">
+    <div style="margin-top:6px;font-size:12px;color:${currentTheme.pos};">
       ${entry.pos.join(", ")}
     </div>
   `;
-  entry.senses.map((sense) => {
-    html += `
-    <div style="margin-top:3px;">
-      ${sense}
-    </div>
-    `
-  })
-  
+
+  entry.senses.forEach((sense) => {
+    html += `<div style="margin-top:3px;">${sense}</div>`;
+  });
 
   tooltip.innerHTML = html;
 }
@@ -163,8 +197,24 @@ function renderTooltip(word, entry) {
    MOUSE HANDLER
    =============================== */
 
+function hasDirectThaiText(el) {
+  for (const node of el.childNodes) {
+    if (node.nodeType === 3 && /[\u0E00-\u0E7F]/.test(node.nodeValue)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function onMove(e) {
   if (!DICT) return;
+
+  // Quick bail: no Thai text in the element under cursor
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (!el || !hasDirectThaiText(el)) {
+    clearHighlight();
+    return;
+  }
 
   const info = caretInfo(e);
   if (!info || !/[\u0E00-\u0E7F]/.test(info.text)) {

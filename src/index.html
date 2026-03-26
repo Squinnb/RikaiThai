@@ -1,10 +1,61 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>RikaiThai Popup</title>
-  </head>
-  <body>
-    <div id="root">Hello</div>
-  </body>
+<html>
+<head>
+  <style>
+    body {
+      width: 220px;
+      padding: 12px;
+      font-family: sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #aaa;
+    }
+    .theme-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .theme-btn.active {
+      border-color: #fff;
+    }
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <h3>Choose Theme</h3>
+
+  <button class="theme-btn" data-theme="Thailand" style="background:#fdf6e3; color:#657b83;">
+    <div class="swatch" style="background:#cb4b16;"></div>
+    Thailand
+  </button>
+
+  <button class="theme-btn" data-theme="midnight" style="background:#1a1b2e; color:#c8c8e8;">
+    <div class="swatch" style="background:#7c6af7;"></div>
+    Midnight
+  </button>
+
+  <button class="theme-btn" data-theme="high-contrast" style="background:#000; color:#fff;">
+    <div class="swatch" style="background:#ffff00;"></div>
+    High Contrast
+  </button>
+
+  <script src="popupscript.js"></script>
+</body>
 </html>
