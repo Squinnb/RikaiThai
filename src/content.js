@@ -272,4 +272,5 @@ async function loadDict() {
 (async function () {
   await loadDict();
   document.addEventListener("mousemove", onMove, true);
+  document.addEventListener("scroll", clearHighlight, true);
 })();
