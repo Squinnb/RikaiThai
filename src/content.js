@@ -11,7 +11,7 @@ let MAX_WORD_LEN = 0;
 let activeMatch = null; // { start, end, word }
 
 const THEMES = {
-  Thailand: {
+  "Thai Flag": {
     background: "#fdf6e3",
     border: "#cb4b16",
     word: "#268bd2",
