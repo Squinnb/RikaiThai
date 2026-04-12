@@ -170,7 +170,7 @@ function findWord(text, cursor) {
   
 
 /* ===============================
-   TOOLTIP UI (POS GROUPED)
+   TOOLTIP UI
    =============================== */
 
 function renderTooltip(word, entry) {
