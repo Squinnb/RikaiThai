@@ -4,7 +4,7 @@ console.log("Thai Dictionary Extension loaded (FINAL RIKAIKUN STYLE)");
    GLOBALS
    =============================== */
 
-const DICT_PATH = "thai_dict2.json";
+const DICT_PATH = "thai_dict3.json";
 let DICT = null;
 let MAX_WORD_LEN = 0;
 
@@ -178,17 +178,33 @@ function renderTooltip(word, entry) {
     <div style="font-size:28px;font-weight:bold;color:${currentTheme.word};">
       ${word}
     </div>
-    <div style="opacity:0.85;margin-bottom:6px;">
+    <div style="opacity:0.85;margin-bottom:4px;">
       ${entry.romanization_paiboon || ""}
     </div>
-    <div style="margin-top:6px;font-size:12px;color:${currentTheme.pos};">
+    <div style="margin-top:5px;font-size:12px;color:${currentTheme.pos};">
       ${entry.pos.join(", ")}
     </div>
   `;
 
   entry.senses.forEach((sense) => {
-    html += `<div style="margin-top:3px;">${sense}</div>`;
+    const gloss = typeof sense === "string" ? sense : sense.gloss;
+    html += `<span>${gloss}</span>`;
   });
+
+  if (entry.components?.length) {
+    const parts = entry.components.map(c => {
+      const cEntry = DICT[c];
+      const cGloss = cEntry?.senses?.[0]
+        ? (typeof cEntry.senses[0] === "string" ? cEntry.senses[0] : cEntry.senses[0].gloss)
+        : "";
+      return cGloss ? `${c} (${cGloss})` : c;
+    });
+    html += `
+      <div style="font-size:12px;color:${currentTheme.pos};">
+        ${parts.join(" + ")}
+      </div>
+    `;
+  }
 
   tooltip.innerHTML = html;
 }

@@ -4,7 +4,7 @@ from collections import defaultdict
 
 INPUT_FILE = "kaikki_thai.jsonl"
 NAMES_FILE = "thai_names.json"
-OUTPUT_FILE = "thai_dict2.json"
+OUTPUT_FILE = "thai_dict3.json"
 
 THAI_RE = re.compile(r"[\u0E00-\u0E7F]+")
 THAI_LOOSE_RE = re.compile(r"[\u0E00-\u0E7F]")
@@ -43,7 +43,9 @@ def extract_senses(entry):
         gloss = glosses[0]
         if any(gloss.startswith(p) for p in [
             "romanization of", "alternative form of", "obsolete form of",
-            "misspelling of", "plural of", "form of"
+            "misspelling of", "plural of", "form of", "abstract noun of",
+            "nominalization of", "gerund of", "past tense of", "noun form of",
+            "verb form of", "adjective form of", "adverb form of",
         ]):
             continue
         register = sorted(tags & REGISTER_TAGS)
