@@ -1,5 +1,5 @@
 /* global chrome */
-console.log("Thai Dictionary Extension loaded (FINAL RIKAIKUN STYLE)");
+console.log("Thai Dictionary Extension loaded");
 
 /* ===============================
    GLOBALS
@@ -13,9 +13,13 @@ const THAI_CHAR_RE = /[\u0E00-\u0E7F]/;
 const UNKNOWN_WORD_LOG_KEY = "unknownWordMisses";
 const UNKNOWN_WORD_MAX_ITEMS = 1000;
 const UNKNOWN_WORD_FLUSH_MS = 2500;
+const ENABLE_UNKNOWN_WORD_LOGGER = false; // Set true for local dictionary curation.
 let unknownWordBuffer = {};
 let unknownWordFlushTimer = null;
 let lastMissSignature = "";
+const thaiSegmenter = typeof Intl !== "undefined" && Intl.Segmenter
+  ? new Intl.Segmenter("th", { granularity: "word" })
+  : null;
 
 let activeMatch = null; // { start, end, word }
 
@@ -50,6 +54,8 @@ let currentTheme = THEMES["midnight"]; // default
    =============================== */
 
 const tooltip = document.createElement("div");
+tooltip.style.all = "initial";
+tooltip.style.boxSizing = "border-box";
 tooltip.style.position = "fixed";
 tooltip.style.zIndex = "2147483647";
 tooltip.style.borderRadius = "6px";
@@ -57,6 +63,10 @@ tooltip.style.padding = "8px";
 tooltip.style.fontSize = "16px";
 tooltip.style.fontFamily = "'Noto Serif Thai', 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', 'Tahoma', serif";
 tooltip.style.fontFeatureSettings = "'liga' 1, 'kern' 1";
+tooltip.style.lineHeight = "1.35";
+tooltip.style.letterSpacing = "normal";
+tooltip.style.wordSpacing = "normal";
+tooltip.style.whiteSpace = "normal";
 tooltip.style.display = "none";
 tooltip.style.maxWidth = "360px";
 document.body.appendChild(tooltip);
@@ -75,7 +85,6 @@ chrome.storage.sync.get("theme", ({ theme }) => {
 });
 
 chrome.storage.onChanged.addListener((changes) => {
-  console.log("storage changed", changes);
   if (changes.theme) {
     applyTheme(changes.theme.newValue);
   }
@@ -164,7 +173,7 @@ function caretInfo(e) {
 }
 
 /* ===============================
-   RIKAIKUN MATCHER (FIXED)
+   MATCHER (FIXED)
    =============================== */
 
 function findWord(text, cursor) {
@@ -183,18 +192,27 @@ function extractUnknownCandidate(text, cursor) {
   if (!text || cursor < 0 || cursor >= text.length) return null;
   if (!THAI_CHAR_RE.test(text[cursor])) return null;
 
+  if (thaiSegmenter) {
+    for (const part of thaiSegmenter.segment(text)) {
+      const index = part.index;
+      const segment = part.segment || "";
+      const end = index + segment.length;
+      if (cursor < index || cursor >= end) continue;
+      if (!part.isWordLike) return null;
+      if (!THAI_CHAR_RE.test(segment)) return null;
+      if (segment.length < 2 || segment.length > 40) return null;
+      return segment;
+    }
+  }
+
   let start = cursor;
   let end = cursor + 1;
   while (start > 0 && THAI_CHAR_RE.test(text[start - 1])) start--;
   while (end < text.length && THAI_CHAR_RE.test(text[end])) end++;
 
   const run = text.slice(start, end);
-  if (run.length < 2) return null;
-
-  const localCursor = cursor - start;
-  const windowStart = Math.max(0, localCursor - 6);
-  const windowEnd = Math.min(run.length, localCursor + 6);
-  return run.length <= 12 ? run : run.slice(windowStart, windowEnd);
+  if (run.length < 2 || run.length > 40) return null;
+  return run;
 }
 
 function scheduleUnknownWordFlush() {
@@ -221,6 +239,7 @@ function scheduleUnknownWordFlush() {
 }
 
 function logUnknownWordMiss(text, cursor) {
+  if (!ENABLE_UNKNOWN_WORD_LOGGER) return;
   const candidate = extractUnknownCandidate(text, cursor);
   if (!candidate) return;
 
@@ -233,6 +252,7 @@ function logUnknownWordMiss(text, cursor) {
 }
 
 function dumpUnknownWordMisses(limit = 100) {
+  if (!ENABLE_UNKNOWN_WORD_LOGGER) return;
   chrome.storage.local.get(UNKNOWN_WORD_LOG_KEY, (res) => {
     const misses = res[UNKNOWN_WORD_LOG_KEY] || {};
     const rows = Object.entries(misses)
@@ -244,6 +264,7 @@ function dumpUnknownWordMisses(limit = 100) {
 }
 
 function clearUnknownWordMisses() {
+  if (!ENABLE_UNKNOWN_WORD_LOGGER) return;
   chrome.storage.local.remove(UNKNOWN_WORD_LOG_KEY);
   unknownWordBuffer = {};
   lastMissSignature = "";
@@ -264,13 +285,13 @@ function renderTooltip(word, entry) {
   const senses = entry.senses;
 
   let html = `
-    <div style="font-family:inherit;font-size:28px;font-weight:bold;color:${currentTheme.word};">
+    <div style="font-family:inherit;display:block;margin:0;padding:0;font-size:28px;line-height:1.2;font-weight:bold;color:${currentTheme.word};">
       ${word}
     </div>
-    <div style="font-family:inherit;opacity:0.85;margin-bottom:6px;">
+    <div style="font-family:inherit;display:block;margin:2px 0 6px 0;padding:0;font-size:15px;line-height:1.25;opacity:0.85;">
       ${roman}
     </div>
-    <div style="font-family:inherit;margin-top:6px;font-size:12px;color:${currentTheme.pos};">
+    <div style="font-family:inherit;display:block;margin:0 0 4px 0;padding:0;font-size:12px;line-height:1.25;color:${currentTheme.pos};">
       ${posText}
     </div>
   `;
@@ -278,9 +299,9 @@ function renderTooltip(word, entry) {
   senses.forEach((sense, idx) => {
     if (!sense || !sense.gloss) return;
     const registerText = sense.register && sense.register.length
-      ? ` <span style="opacity:0.8;color:${currentTheme.pos};">(${sense.register.join(", ")})</span>`
+      ? ` <span style="font-family:inherit;opacity:0.8;color:${currentTheme.pos};">(${sense.register.join(", ")})</span>`
       : "";
-    html += `<div style="font-family:inherit;margin-top:4px;font-size:14px;line-height:1.35;">
+    html += `<div style="font-family:inherit;display:block;margin:4px 0 0 0;padding:0;font-size:14px;line-height:1.35;">
       <span style="font-size:11px;opacity:0.75;color:${currentTheme.pos};margin-right:4px;">${idx + 1}.</span>
       ${sense.gloss}${registerText}
     </div>`;
@@ -384,8 +405,10 @@ async function loadDict() {
   await loadDict();
   document.addEventListener("mousemove", onMove, true);
   document.addEventListener("scroll", clearHighlight, true);
-  window.__thaiDictTools = {
-    dumpUnknownWordMisses,
-    clearUnknownWordMisses
-  };
+  if (ENABLE_UNKNOWN_WORD_LOGGER) {
+    window.__thaiDictTools = {
+      dumpUnknownWordMisses,
+      clearUnknownWordMisses
+    };
+  }
 })();
