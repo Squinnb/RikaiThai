@@ -1,0 +1,540 @@
+{
+  "regions": [
+    {
+      "word": "ภาคเหนือ",
+      "roman": "phak nuea"
+    },
+    {
+      "word": "ภาคตะวันออกเฉียงเหนือ",
+      "roman": "phak tawan-ok chiang nuea"
+    },
+    {
+      "word": "ภาคกลาง",
+      "roman": "phak klang"
+    },
+    {
+      "word": "ภาคตะวันออก",
+      "roman": "phak tawan-ok"
+    },
+    {
+      "word": "ภาคตะวันตก",
+      "roman": "phak tawan-tok"
+    },
+    {
+      "word": "ภาคใต้",
+      "roman": "phak tai"
+    }
+  ],
+  "provinces": [
+    {
+      "word": "กรุงเทพมหานคร",
+      "roman": null
+    },
+    {
+      "word": "กระบี่",
+      "roman": null
+    },
+    {
+      "word": "กาญจนบุรี",
+      "roman": null
+    },
+    {
+      "word": "กาฬสินธุ์",
+      "roman": null
+    },
+    {
+      "word": "กำแพงเพชร",
+      "roman": null
+    },
+    {
+      "word": "ขอนแก่น",
+      "roman": null
+    },
+    {
+      "word": "จันทบุรี",
+      "roman": null
+    },
+    {
+      "word": "ฉะเชิงเทรา",
+      "roman": null
+    },
+    {
+      "word": "ชลบุรี",
+      "roman": null
+    },
+    {
+      "word": "ชัยนาท",
+      "roman": null
+    },
+    {
+      "word": "ชัยภูมิ",
+      "roman": null
+    },
+    {
+      "word": "ชุมพร",
+      "roman": null
+    },
+    {
+      "word": "เชียงราย",
+      "roman": null
+    },
+    {
+      "word": "เชียงใหม่",
+      "roman": null
+    },
+    {
+      "word": "ตรัง",
+      "roman": null
+    },
+    {
+      "word": "ตราด",
+      "roman": null
+    },
+    {
+      "word": "ตาก",
+      "roman": null
+    },
+    {
+      "word": "นครนายก",
+      "roman": null
+    },
+    {
+      "word": "นครปฐม",
+      "roman": null
+    },
+    {
+      "word": "นครพนม",
+      "roman": null
+    },
+    {
+      "word": "นครราชสีมา",
+      "roman": null
+    },
+    {
+      "word": "นครศรีธรรมราช",
+      "roman": null
+    },
+    {
+      "word": "นครสวรรค์",
+      "roman": null
+    },
+    {
+      "word": "นนทบุรี",
+      "roman": null
+    },
+    {
+      "word": "นราธิวาส",
+      "roman": null
+    },
+    {
+      "word": "น่าน",
+      "roman": null
+    },
+    {
+      "word": "บึงกาฬ",
+      "roman": null
+    },
+    {
+      "word": "บุรีรัมย์",
+      "roman": null
+    },
+    {
+      "word": "ปทุมธานี",
+      "roman": null
+    },
+    {
+      "word": "ประจวบคีรีขันธ์",
+      "roman": null
+    },
+    {
+      "word": "ปราจีนบุรี",
+      "roman": null
+    },
+    {
+      "word": "ปัตตานี",
+      "roman": null
+    },
+    {
+      "word": "พระนครศรีอยุธยา",
+      "roman": null
+    },
+    {
+      "word": "พังงา",
+      "roman": null
+    },
+    {
+      "word": "พัทลุง",
+      "roman": null
+    },
+    {
+      "word": "พิจิตร",
+      "roman": null
+    },
+    {
+      "word": "พิษณุโลก",
+      "roman": null
+    },
+    {
+      "word": "เพชรบุรี",
+      "roman": null
+    },
+    {
+      "word": "เพชรบูรณ์",
+      "roman": null
+    },
+    {
+      "word": "แพร่",
+      "roman": null
+    },
+    {
+      "word": "พะเยา",
+      "roman": null
+    },
+    {
+      "word": "ภูเก็ต",
+      "roman": null
+    },
+    {
+      "word": "มหาสารคาม",
+      "roman": null
+    },
+    {
+      "word": "มุกดาหาร",
+      "roman": null
+    },
+    {
+      "word": "แม่ฮ่องสอน",
+      "roman": null
+    },
+    {
+      "word": "ยโสธร",
+      "roman": null
+    },
+    {
+      "word": "ยะลา",
+      "roman": null
+    },
+    {
+      "word": "ร้อยเอ็ด",
+      "roman": null
+    },
+    {
+      "word": "ระนอง",
+      "roman": null
+    },
+    {
+      "word": "ระยอง",
+      "roman": null
+    },
+    {
+      "word": "ราชบุรี",
+      "roman": null
+    },
+    {
+      "word": "ลพบุรี",
+      "roman": null
+    },
+    {
+      "word": "ลำปาง",
+      "roman": null
+    },
+    {
+      "word": "ลำพูน",
+      "roman": null
+    },
+    {
+      "word": "เลย",
+      "roman": null
+    },
+    {
+      "word": "ศรีสะเกษ",
+      "roman": null
+    },
+    {
+      "word": "สกลนคร",
+      "roman": null
+    },
+    {
+      "word": "สงขลา",
+      "roman": null
+    },
+    {
+      "word": "สตูล",
+      "roman": null
+    },
+    {
+      "word": "สมุทรปราการ",
+      "roman": null
+    },
+    {
+      "word": "สมุทรสงคราม",
+      "roman": null
+    },
+    {
+      "word": "สมุทรสาคร",
+      "roman": null
+    },
+    {
+      "word": "สระแก้ว",
+      "roman": null
+    },
+    {
+      "word": "สระบุรี",
+      "roman": null
+    },
+    {
+      "word": "สิงห์บุรี",
+      "roman": null
+    },
+    {
+      "word": "สุโขทัย",
+      "roman": null
+    },
+    {
+      "word": "สุพรรณบุรี",
+      "roman": null
+    },
+    {
+      "word": "สุราษฎร์ธานี",
+      "roman": null
+    },
+    {
+      "word": "สุรินทร์",
+      "roman": null
+    },
+    {
+      "word": "หนองคาย",
+      "roman": null
+    },
+    {
+      "word": "หนองบัวลำภู",
+      "roman": null
+    },
+    {
+      "word": "อ่างทอง",
+      "roman": null
+    },
+    {
+      "word": "อำนาจเจริญ",
+      "roman": null
+    },
+    {
+      "word": "อุดรธานี",
+      "roman": null
+    },
+    {
+      "word": "อุตรดิตถ์",
+      "roman": null
+    },
+    {
+      "word": "อุทัยธานี",
+      "roman": null
+    },
+    {
+      "word": "อุบลราชธานี",
+      "roman": null
+    }
+  ],
+  "bangkok_districts": [
+    {
+      "word": "พระนคร",
+      "roman": null
+    },
+    {
+      "word": "ดุสิต",
+      "roman": null
+    },
+    {
+      "word": "หนองจอก",
+      "roman": null
+    },
+    {
+      "word": "บางรัก",
+      "roman": null
+    },
+    {
+      "word": "บางเขน",
+      "roman": null
+    },
+    {
+      "word": "บางกะปิ",
+      "roman": null
+    },
+    {
+      "word": "ปทุมวัน",
+      "roman": null
+    },
+    {
+      "word": "ป้อมปราบศัตรูพ่าย",
+      "roman": null
+    },
+    {
+      "word": "พระโขนง",
+      "roman": null
+    },
+    {
+      "word": "มีนบุรี",
+      "roman": null
+    },
+    {
+      "word": "ลาดกระบัง",
+      "roman": null
+    },
+    {
+      "word": "ยานนาวา",
+      "roman": null
+    },
+    {
+      "word": "สัมพันธวงศ์",
+      "roman": null
+    },
+    {
+      "word": "พญาไท",
+      "roman": null
+    },
+    {
+      "word": "ธนบุรี",
+      "roman": null
+    },
+    {
+      "word": "บางกอกใหญ่",
+      "roman": null
+    },
+    {
+      "word": "ห้วยขวาง",
+      "roman": null
+    },
+    {
+      "word": "คลองสาน",
+      "roman": null
+    },
+    {
+      "word": "ตลิ่งชัน",
+      "roman": null
+    },
+    {
+      "word": "บางกอกน้อย",
+      "roman": null
+    },
+    {
+      "word": "บางขุนเทียน",
+      "roman": null
+    },
+    {
+      "word": "ภาษีเจริญ",
+      "roman": null
+    },
+    {
+      "word": "หนองแขม",
+      "roman": null
+    },
+    {
+      "word": "ราษฎร์บูรณะ",
+      "roman": null
+    },
+    {
+      "word": "บางพลัด",
+      "roman": null
+    },
+    {
+      "word": "ดินแดง",
+      "roman": null
+    },
+    {
+      "word": "บึงกุ่ม",
+      "roman": null
+    },
+    {
+      "word": "สาทร",
+      "roman": null
+    },
+    {
+      "word": "บางซื่อ",
+      "roman": null
+    },
+    {
+      "word": "จตุจักร",
+      "roman": null
+    },
+    {
+      "word": "บางคอแหลม",
+      "roman": null
+    },
+    {
+      "word": "ประเวศ",
+      "roman": null
+    },
+    {
+      "word": "คลองเตย",
+      "roman": null
+    },
+    {
+      "word": "สวนหลวง",
+      "roman": null
+    },
+    {
+      "word": "จอมทอง",
+      "roman": null
+    },
+    {
+      "word": "ดอนเมือง",
+      "roman": null
+    },
+    {
+      "word": "ราชเทวี",
+      "roman": null
+    },
+    {
+      "word": "ลาดพร้าว",
+      "roman": null
+    },
+    {
+      "word": "วัฒนา",
+      "roman": null
+    },
+    {
+      "word": "บางแค",
+      "roman": null
+    },
+    {
+      "word": "หลักสี่",
+      "roman": null
+    },
+    {
+      "word": "สายไหม",
+      "roman": null
+    },
+    {
+      "word": "คันนายาว",
+      "roman": null
+    },
+    {
+      "word": "สะพานสูง",
+      "roman": null
+    },
+    {
+      "word": "วังทองหลาง",
+      "roman": null
+    },
+    {
+      "word": "คลองสามวา",
+      "roman": null
+    },
+    {
+      "word": "บางนา",
+      "roman": null
+    },
+    {
+      "word": "ทวีวัฒนา",
+      "roman": null
+    },
+    {
+      "word": "ทุ่งครุ",
+      "roman": null
+    },
+    {
+      "word": "บางบอน",
+      "roman": null
+    }
+  ]
+}

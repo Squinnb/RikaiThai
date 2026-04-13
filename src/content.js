@@ -1,12 +1,21 @@
+/* global chrome */
 console.log("Thai Dictionary Extension loaded (FINAL RIKAIKUN STYLE)");
 
 /* ===============================
    GLOBALS
    =============================== */
 
-const DICT_PATH = "thai_dict2.json";
+const DICT_PATH = "enhanced_thai_dict.json";
 let DICT = null;
 let MAX_WORD_LEN = 0;
+const THAI_CHAR_RE = /[\u0E00-\u0E7F]/;
+
+const UNKNOWN_WORD_LOG_KEY = "unknownWordMisses";
+const UNKNOWN_WORD_MAX_ITEMS = 1000;
+const UNKNOWN_WORD_FLUSH_MS = 2500;
+let unknownWordBuffer = {};
+let unknownWordFlushTimer = null;
+let lastMissSignature = "";
 
 let activeMatch = null; // { start, end, word }
 
@@ -46,6 +55,8 @@ tooltip.style.zIndex = "2147483647";
 tooltip.style.borderRadius = "6px";
 tooltip.style.padding = "8px";
 tooltip.style.fontSize = "16px";
+tooltip.style.fontFamily = "'Noto Serif Thai', 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', 'Tahoma', serif";
+tooltip.style.fontFeatureSettings = "'liga' 1, 'kern' 1";
 tooltip.style.display = "none";
 tooltip.style.maxWidth = "360px";
 document.body.appendChild(tooltip);
@@ -167,6 +178,80 @@ function findWord(text, cursor) {
   }
   return null;
 }
+
+function extractUnknownCandidate(text, cursor) {
+  if (!text || cursor < 0 || cursor >= text.length) return null;
+  if (!THAI_CHAR_RE.test(text[cursor])) return null;
+
+  let start = cursor;
+  let end = cursor + 1;
+  while (start > 0 && THAI_CHAR_RE.test(text[start - 1])) start--;
+  while (end < text.length && THAI_CHAR_RE.test(text[end])) end++;
+
+  const run = text.slice(start, end);
+  if (run.length < 2) return null;
+
+  const localCursor = cursor - start;
+  const windowStart = Math.max(0, localCursor - 6);
+  const windowEnd = Math.min(run.length, localCursor + 6);
+  return run.length <= 12 ? run : run.slice(windowStart, windowEnd);
+}
+
+function scheduleUnknownWordFlush() {
+  if (unknownWordFlushTimer) return;
+  unknownWordFlushTimer = setTimeout(() => {
+    const pending = unknownWordBuffer;
+    unknownWordBuffer = {};
+    unknownWordFlushTimer = null;
+
+    chrome.storage.local.get(UNKNOWN_WORD_LOG_KEY, (res) => {
+      const existing = res[UNKNOWN_WORD_LOG_KEY] || {};
+      for (const [word, count] of Object.entries(pending)) {
+        existing[word] = (existing[word] || 0) + count;
+      }
+
+      const trimmed = Object.fromEntries(
+        Object.entries(existing)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, UNKNOWN_WORD_MAX_ITEMS)
+      );
+      chrome.storage.local.set({ [UNKNOWN_WORD_LOG_KEY]: trimmed });
+    });
+  }, UNKNOWN_WORD_FLUSH_MS);
+}
+
+function logUnknownWordMiss(text, cursor) {
+  const candidate = extractUnknownCandidate(text, cursor);
+  if (!candidate) return;
+
+  const signature = `${candidate}|${cursor}`;
+  if (signature === lastMissSignature) return;
+  lastMissSignature = signature;
+
+  unknownWordBuffer[candidate] = (unknownWordBuffer[candidate] || 0) + 1;
+  scheduleUnknownWordFlush();
+}
+
+function dumpUnknownWordMisses(limit = 100) {
+  chrome.storage.local.get(UNKNOWN_WORD_LOG_KEY, (res) => {
+    const misses = res[UNKNOWN_WORD_LOG_KEY] || {};
+    const rows = Object.entries(misses)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([word, count]) => ({ word, count }));
+    console.table(rows);
+  });
+}
+
+function clearUnknownWordMisses() {
+  chrome.storage.local.remove(UNKNOWN_WORD_LOG_KEY);
+  unknownWordBuffer = {};
+  lastMissSignature = "";
+  if (unknownWordFlushTimer) {
+    clearTimeout(unknownWordFlushTimer);
+    unknownWordFlushTimer = null;
+  }
+}
   
 
 /* ===============================
@@ -174,20 +259,31 @@ function findWord(text, cursor) {
    =============================== */
 
 function renderTooltip(word, entry) {
+  const posText = entry.pos.join(", ");
+  const roman = entry.romanization_paiboon || "";
+  const senses = entry.senses;
+
   let html = `
-    <div style="font-size:28px;font-weight:bold;color:${currentTheme.word};">
+    <div style="font-family:inherit;font-size:28px;font-weight:bold;color:${currentTheme.word};">
       ${word}
     </div>
-    <div style="opacity:0.85;margin-bottom:6px;">
-      ${entry.romanization_paiboon || ""}
+    <div style="font-family:inherit;opacity:0.85;margin-bottom:6px;">
+      ${roman}
     </div>
-    <div style="margin-top:6px;font-size:12px;color:${currentTheme.pos};">
-      ${entry.pos.join(", ")}
+    <div style="font-family:inherit;margin-top:6px;font-size:12px;color:${currentTheme.pos};">
+      ${posText}
     </div>
   `;
 
-  entry.senses.forEach((sense) => {
-    html += `<div style="margin-top:3px;">${sense}</div>`;
+  senses.forEach((sense, idx) => {
+    if (!sense || !sense.gloss) return;
+    const registerText = sense.register && sense.register.length
+      ? ` <span style="opacity:0.8;color:${currentTheme.pos};">(${sense.register.join(", ")})</span>`
+      : "";
+    html += `<div style="font-family:inherit;margin-top:4px;font-size:14px;line-height:1.35;">
+      <span style="font-size:11px;opacity:0.75;color:${currentTheme.pos};margin-right:4px;">${idx + 1}.</span>
+      ${sense.gloss}${registerText}
+    </div>`;
   });
 
   tooltip.innerHTML = html;
@@ -248,6 +344,7 @@ function onMove(e) {
 
   const match = findWord(info.text, info.offset);
   if (!match) {
+    logUnknownWordMiss(info.text, info.offset);
     clearHighlight();
     return;
   }
@@ -287,4 +384,8 @@ async function loadDict() {
   await loadDict();
   document.addEventListener("mousemove", onMove, true);
   document.addEventListener("scroll", clearHighlight, true);
+  window.__thaiDictTools = {
+    dumpUnknownWordMisses,
+    clearUnknownWordMisses
+  };
 })();

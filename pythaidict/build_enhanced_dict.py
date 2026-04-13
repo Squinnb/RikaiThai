@@ -4,7 +4,9 @@ import re
 INPUT_FILE = "kaikki_thai.jsonl"
 NAMES_FILE = "thai_names.json"
 TRANSIT_FILE = "bangkok_transit_names.json"
-OUTPUT_FILE = "thai_dict2.json"
+ADMIN_FILE = "thai_admin_names.json"
+COMMON_OVERRIDE_FILE = "thai_common_words_override.json"
+OUTPUT_FILE = "enhanced_thai_dict.json"
 
 THAI_RE = re.compile(r"[\u0E00-\u0E7F]+")
 THAI_LOOSE_RE = re.compile(r"[\u0E00-\u0E7F]")
@@ -139,6 +141,135 @@ def merge_transit_names(lemmas):
             tags=["transport"],
             priority=135
         )
+
+def merge_admin_names(lemmas):
+    print("Merging Thai administrative names…")
+    with open(ADMIN_FILE, encoding="utf-8") as f:
+        admin = json.load(f)
+
+    def upsert_name(word, roman, gloss, tags=None, priority=132):
+        if not word:
+            return
+        if word not in lemmas:
+            lemmas[word] = {
+                "word": word,
+                "pos": {"name", "noun"},
+                "romanization_paiboon": roman,
+                "senses": [{
+                    "gloss": gloss,
+                    "register": tags or [],
+                    "examples": []
+                }],
+                "components": [],
+                "derived": [],
+                "idioms": [],
+                "compounds": [],
+                "synonyms": [],
+                "is_common": True,
+                "priority": priority
+            }
+            return
+
+        existing_glosses = {s["gloss"] for s in lemmas[word]["senses"]}
+        if gloss not in existing_glosses:
+            lemmas[word]["senses"].insert(0, {
+                "gloss": gloss,
+                "register": tags or [],
+                "examples": []
+            })
+        if not lemmas[word]["romanization_paiboon"] and roman:
+            lemmas[word]["romanization_paiboon"] = roman
+        lemmas[word]["pos"].update({"name", "noun"})
+        lemmas[word]["is_common"] = True
+        lemmas[word]["priority"] = max(lemmas[word]["priority"], priority)
+
+    for region in admin.get("regions", []):
+        upsert_name(
+            region.get("word"),
+            region.get("roman"),
+            "Thai administrative region",
+            tags=["geo", "admin"],
+            priority=138
+        )
+
+    for province in admin.get("provinces", []):
+        upsert_name(
+            province.get("word"),
+            province.get("roman"),
+            "Thai province",
+            tags=["geo", "admin"],
+            priority=136
+        )
+
+    for district in admin.get("bangkok_districts", []):
+        upsert_name(
+            district.get("word"),
+            district.get("roman"),
+            "Bangkok district (khet)",
+            tags=["geo", "admin"],
+            priority=134
+        )
+
+def merge_common_overrides(lemmas):
+    print("Merging Thai common word overrides…")
+    with open(COMMON_OVERRIDE_FILE, encoding="utf-8") as f:
+        payload = json.load(f)
+
+    for item in payload.get("entries", []):
+        word = item.get("word")
+        if not word:
+            continue
+
+        pos = set(item.get("pos", [])) or {"particle"}
+        roman = item.get("romanization_paiboon")
+        senses = item.get("senses", [])
+        priority = int(item.get("priority", 180))
+        register = item.get("register", ["common"])
+
+        cleaned_senses = []
+        for s in senses:
+            if isinstance(s, str):
+                cleaned_senses.append({"gloss": s, "register": register, "examples": []})
+            elif isinstance(s, dict) and s.get("gloss"):
+                cleaned_senses.append({
+                    "gloss": s["gloss"],
+                    "register": s.get("register", register),
+                    "examples": s.get("examples", [])
+                })
+
+        if not cleaned_senses:
+            continue
+
+        if word not in lemmas:
+            lemmas[word] = {
+                "word": word,
+                "pos": pos,
+                "romanization_paiboon": roman,
+                "senses": cleaned_senses,
+                "components": item.get("components", []),
+                "derived": item.get("derived", []),
+                "idioms": item.get("idioms", []),
+                "compounds": item.get("compounds", []),
+                "synonyms": item.get("synonyms", []),
+                "is_common": True,
+                "priority": priority
+            }
+            continue
+
+        existing = lemmas[word]
+        existing_glosses = {s["gloss"] for s in existing["senses"]}
+        for sense in reversed(cleaned_senses):
+            if sense["gloss"] not in existing_glosses:
+                existing["senses"].insert(0, sense)
+
+        if roman:
+            existing["romanization_paiboon"] = roman
+        existing["pos"].update(pos)
+        existing["is_common"] = True
+        existing["priority"] = max(existing["priority"], priority)
+
+        for key in ["components", "derived", "idioms", "compounds", "synonyms"]:
+            existing[key].extend(item.get(key, []))
 
 print("Loading Kaikki Thai JSONL…")
 
@@ -317,6 +448,8 @@ for name in names:
 # ------------------------------------------------------------
 
 merge_transit_names(lemmas)
+merge_admin_names(lemmas)
+merge_common_overrides(lemmas)
 
 out_data = {}
 

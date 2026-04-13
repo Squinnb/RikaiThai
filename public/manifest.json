@@ -18,7 +18,7 @@
     ],
     "web_accessible_resources": [
       {
-        "resources": ["thai_dict2.json"],
+        "resources": ["enhanced_thai_dict.json"],
         "matches": ["<all_urls>"]
       }
     ]
