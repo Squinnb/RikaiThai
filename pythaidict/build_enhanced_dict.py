@@ -1,9 +1,9 @@
 import json
 import re
-from collections import defaultdict
 
 INPUT_FILE = "kaikki_thai.jsonl"
 NAMES_FILE = "thai_names.json"
+TRANSIT_FILE = "bangkok_transit_names.json"
 OUTPUT_FILE = "thai_dict2.json"
 
 THAI_RE = re.compile(r"[\u0E00-\u0E7F]+")
@@ -70,6 +70,75 @@ def get_synonyms(entry):
 
 def char_len(word):
     return len(list(word))
+
+def merge_transit_names(lemmas):
+    print("Merging Bangkok transit names…")
+    with open(TRANSIT_FILE, encoding="utf-8") as f:
+        transit = json.load(f)
+
+    def upsert_name(word, roman, gloss, tags=None, priority=130):
+        if not word:
+            return
+        if word not in lemmas:
+            lemmas[word] = {
+                "word": word,
+                "pos": {"name", "noun"},
+                "romanization_paiboon": roman,
+                "senses": [{
+                    "gloss": gloss,
+                    "register": tags or [],
+                    "examples": []
+                }],
+                "components": [],
+                "derived": [],
+                "idioms": [],
+                "compounds": [],
+                "synonyms": [],
+                "is_common": True,
+                "priority": priority
+            }
+            return
+
+        existing_glosses = {s["gloss"] for s in lemmas[word]["senses"]}
+        if gloss not in existing_glosses:
+            lemmas[word]["senses"].insert(0, {
+                "gloss": gloss,
+                "register": tags or [],
+                "examples": []
+            })
+        if not lemmas[word]["romanization_paiboon"] and roman:
+            lemmas[word]["romanization_paiboon"] = roman
+        lemmas[word]["pos"].update({"name", "noun"})
+        lemmas[word]["is_common"] = True
+        lemmas[word]["priority"] = max(lemmas[word]["priority"], priority)
+
+    for line in transit.get("lines", []):
+        line_name = line.get("word")
+        line_roman = line.get("roman")
+        operator = line.get("operator", "Bangkok rail")
+        upsert_name(
+            line_name,
+            line_roman,
+            f"{operator} train line",
+            tags=["transport"],
+            priority=140
+        )
+
+    for station in transit.get("stations", []):
+        station_name = station.get("word")
+        station_roman = station.get("roman")
+        line = station.get("line")
+        if line:
+            gloss = f"Bangkok train station on {line}"
+        else:
+            gloss = "Bangkok train station"
+        upsert_name(
+            station_name,
+            station_roman,
+            gloss,
+            tags=["transport"],
+            priority=135
+        )
 
 print("Loading Kaikki Thai JSONL…")
 
@@ -246,6 +315,8 @@ for name in names:
 # ------------------------------------------------------------
 # Final cleanup
 # ------------------------------------------------------------
+
+merge_transit_names(lemmas)
 
 out_data = {}
 
