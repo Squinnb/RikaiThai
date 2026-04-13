@@ -20,6 +20,9 @@ let lastMissSignature = "";
 const thaiSegmenter = typeof Intl !== "undefined" && Intl.Segmenter
   ? new Intl.Segmenter("th", { granularity: "word" })
   : null;
+const TOOLTIP_HIDE_DELAY_MS = 320;
+let tooltipHideTimer = null;
+let isHoveringTooltip = false;
 
 let activeMatch = null; // { start, end, word }
 
@@ -67,9 +70,24 @@ tooltip.style.lineHeight = "1.35";
 tooltip.style.letterSpacing = "normal";
 tooltip.style.wordSpacing = "normal";
 tooltip.style.whiteSpace = "normal";
+tooltip.style.pointerEvents = "auto";
+tooltip.style.userSelect = "text";
 tooltip.style.display = "none";
 tooltip.style.maxWidth = "360px";
 document.body.appendChild(tooltip);
+
+tooltip.addEventListener("mouseenter", () => {
+  isHoveringTooltip = true;
+  if (tooltipHideTimer) {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = null;
+  }
+});
+
+tooltip.addEventListener("mouseleave", () => {
+  isHoveringTooltip = false;
+  scheduleClearHighlight();
+});
 
 function applyTheme(t) {
   const theme = THEMES[t] || THEMES["midnight"];
@@ -111,16 +129,36 @@ function drawHighlight(node, start, end) {
   range.setEnd(node, end);
 
   const rect = range.getClientRects()[0];
-  if (!rect) return;
+  if (!rect) return null;
 
   highlight.style.left = `${rect.left}px`;
   highlight.style.top = `${rect.top}px`;
   highlight.style.width = `${rect.width}px`;
   highlight.style.height = `${rect.height}px`;
   highlight.style.display = "block";
+  return rect;
+}
+
+function pointInRect(x, y, rect) {
+  return !!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+function scheduleClearHighlight() {
+  if (tooltipHideTimer) return;
+  tooltipHideTimer = setTimeout(() => {
+    tooltipHideTimer = null;
+    if (!isHoveringTooltip) clearHighlight();
+  }, TOOLTIP_HIDE_DELAY_MS);
+}
+
+function cancelClearHighlight() {
+  if (!tooltipHideTimer) return;
+  clearTimeout(tooltipHideTimer);
+  tooltipHideTimer = null;
 }
 
 function clearHighlight() {
+  cancelClearHighlight();
   highlight.style.display = "none";
   tooltip.style.display = "none";
   activeMatch = null;
@@ -339,17 +377,25 @@ chrome.storage.onChanged.addListener((changes) => {
 
 function onMove(e) {
   if (!DICT || !isEnabled) return;
+  cancelClearHighlight();
+
+  if (tooltip.style.display === "block") {
+    const tooltipRect = tooltip.getBoundingClientRect();
+    if (pointInRect(e.clientX, e.clientY, tooltipRect)) return;
+  }
 
   // Quick bail: no Thai text in the element under cursor
   const el = document.elementFromPoint(e.clientX, e.clientY);
   if (!el || !hasDirectThaiText(el)) {
-    clearHighlight();
+    if (isHoveringTooltip) return;
+    scheduleClearHighlight();
     return;
   }
 
   const info = caretInfo(e);
   if (!info || !/[\u0E00-\u0E7F]/.test(info.text)) {
-    clearHighlight();
+    if (isHoveringTooltip) return;
+    scheduleClearHighlight();
     return;
   }
 
@@ -366,7 +412,8 @@ function onMove(e) {
   const match = findWord(info.text, info.offset);
   if (!match) {
     logUnknownWordMiss(info.text, info.offset);
-    clearHighlight();
+    if (isHoveringTooltip) return;
+    scheduleClearHighlight();
     return;
   }
 
@@ -376,12 +423,41 @@ function onMove(e) {
     end: match.end
   };
 
-  drawHighlight(info.node, match.start, match.end);
+  const wordRect = drawHighlight(info.node, match.start, match.end);
   renderTooltip(match.word, match.entry);
+  const gap = 6;
+  const viewportPadding = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
 
-  tooltip.style.left = `${e.clientX + 18}px`;
-  tooltip.style.top = `${e.clientY + 20}px`;
+  // Measure first, then place to avoid clipping off-screen.
+  tooltip.style.visibility = "hidden";
   tooltip.style.display = "block";
+
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const anchorX = wordRect ? wordRect.left + (wordRect.width / 2) : e.clientX;
+  const anchorYTop = wordRect ? wordRect.top : e.clientY;
+  const anchorYBottom = wordRect ? wordRect.bottom : e.clientY;
+
+  let left = anchorX + gap;
+  let top = anchorYBottom + gap;
+
+  // Flip horizontally if overflowing right edge.
+  if (left + tooltipRect.width + viewportPadding > vw) {
+    left = anchorX - tooltipRect.width - gap;
+  }
+  // Flip vertically if overflowing bottom edge.
+  if (top + tooltipRect.height + viewportPadding > vh) {
+    top = anchorYTop - tooltipRect.height - gap;
+  }
+
+  // Clamp into viewport as final safety.
+  left = Math.max(viewportPadding, Math.min(left, vw - tooltipRect.width - viewportPadding));
+  top = Math.max(viewportPadding, Math.min(top, vh - tooltipRect.height - viewportPadding));
+
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
+  tooltip.style.visibility = "visible";
 }
 
 /* ===============================
