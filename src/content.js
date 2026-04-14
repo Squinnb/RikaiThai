@@ -10,16 +10,6 @@ let DICT = null;
 let MAX_WORD_LEN = 0;
 const THAI_CHAR_RE = /[\u0E00-\u0E7F]/;
 
-const UNKNOWN_WORD_LOG_KEY = "unknownWordMisses";
-const UNKNOWN_WORD_MAX_ITEMS = 1000;
-const UNKNOWN_WORD_FLUSH_MS = 2500;
-const ENABLE_UNKNOWN_WORD_LOGGER = false; // Set true for local dictionary curation.
-let unknownWordBuffer = {};
-let unknownWordFlushTimer = null;
-let lastMissSignature = "";
-const thaiSegmenter = typeof Intl !== "undefined" && Intl.Segmenter
-  ? new Intl.Segmenter("th", { granularity: "word" })
-  : null;
 const TOOLTIP_HIDE_DELAY_MS = 320;
 let tooltipHideTimer = null;
 let isHoveringTooltip = false;
@@ -27,7 +17,7 @@ let isHoveringTooltip = false;
 let activeMatch = null; // { start, end, word }
 
 const THEMES = {
-  "Thai Flag": {
+  "solar": {
     background: "#fdf6e3",
     border: "#cb4b16",
     word: "#268bd2",
@@ -41,10 +31,10 @@ const THEMES = {
     pos: "#7a7a9a",
     text: "#c8c8e8",
   },
-  "high-contrast": {
+  "terminal": {
     background: "#000000",
-    border: "#ffff00",
-    word: "#ffff00",
+    border: "#00ba6adf",
+    word: "#00ba6adf",
     pos: "#aaaaaa",
     text: "#ffffff",
   },
@@ -228,92 +218,6 @@ function findWord(text, cursor) {
   return null;
 }
 
-function extractUnknownCandidate(text, cursor) {
-  if (!text || cursor < 0 || cursor >= text.length) return null;
-  if (!THAI_CHAR_RE.test(text[cursor])) return null;
-
-  if (thaiSegmenter) {
-    for (const part of thaiSegmenter.segment(text)) {
-      const index = part.index;
-      const segment = part.segment || "";
-      const end = index + segment.length;
-      if (cursor < index || cursor >= end) continue;
-      if (!part.isWordLike) return null;
-      if (!THAI_CHAR_RE.test(segment)) return null;
-      if (segment.length < 2 || segment.length > 40) return null;
-      return segment;
-    }
-  }
-
-  let start = cursor;
-  let end = cursor + 1;
-  while (start > 0 && THAI_CHAR_RE.test(text[start - 1])) start--;
-  while (end < text.length && THAI_CHAR_RE.test(text[end])) end++;
-
-  const run = text.slice(start, end);
-  if (run.length < 2 || run.length > 40) return null;
-  return run;
-}
-
-function scheduleUnknownWordFlush() {
-  if (unknownWordFlushTimer) return;
-  unknownWordFlushTimer = setTimeout(() => {
-    const pending = unknownWordBuffer;
-    unknownWordBuffer = {};
-    unknownWordFlushTimer = null;
-
-    chrome.storage.local.get(UNKNOWN_WORD_LOG_KEY, (res) => {
-      const existing = res[UNKNOWN_WORD_LOG_KEY] || {};
-      for (const [word, count] of Object.entries(pending)) {
-        existing[word] = (existing[word] || 0) + count;
-      }
-
-      const trimmed = Object.fromEntries(
-        Object.entries(existing)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, UNKNOWN_WORD_MAX_ITEMS)
-      );
-      chrome.storage.local.set({ [UNKNOWN_WORD_LOG_KEY]: trimmed });
-    });
-  }, UNKNOWN_WORD_FLUSH_MS);
-}
-
-function logUnknownWordMiss(text, cursor) {
-  if (!ENABLE_UNKNOWN_WORD_LOGGER) return;
-  const candidate = extractUnknownCandidate(text, cursor);
-  if (!candidate) return;
-
-  const signature = `${candidate}|${cursor}`;
-  if (signature === lastMissSignature) return;
-  lastMissSignature = signature;
-
-  unknownWordBuffer[candidate] = (unknownWordBuffer[candidate] || 0) + 1;
-  scheduleUnknownWordFlush();
-}
-
-function dumpUnknownWordMisses(limit = 100) {
-  if (!ENABLE_UNKNOWN_WORD_LOGGER) return;
-  chrome.storage.local.get(UNKNOWN_WORD_LOG_KEY, (res) => {
-    const misses = res[UNKNOWN_WORD_LOG_KEY] || {};
-    const rows = Object.entries(misses)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit)
-      .map(([word, count]) => ({ word, count }));
-    console.table(rows);
-  });
-}
-
-function clearUnknownWordMisses() {
-  if (!ENABLE_UNKNOWN_WORD_LOGGER) return;
-  chrome.storage.local.remove(UNKNOWN_WORD_LOG_KEY);
-  unknownWordBuffer = {};
-  lastMissSignature = "";
-  if (unknownWordFlushTimer) {
-    clearTimeout(unknownWordFlushTimer);
-    unknownWordFlushTimer = null;
-  }
-}
-  
 
 /* ===============================
    TOOLTIP UI
@@ -413,7 +317,6 @@ function onMove(e) {
 
   const match = findWord(info.text, info.offset);
   if (!match) {
-    logUnknownWordMiss(info.text, info.offset);
     if (isHoveringTooltip) return;
     scheduleClearHighlight();
     return;
@@ -483,10 +386,4 @@ async function loadDict() {
   await loadDict();
   document.addEventListener("mousemove", onMove, true);
   document.addEventListener("scroll", clearHighlight, true);
-  if (ENABLE_UNKNOWN_WORD_LOGGER) {
-    window.__thaiDictTools = {
-      dumpUnknownWordMisses,
-      clearUnknownWordMisses
-    };
-  }
 })();
