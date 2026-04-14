@@ -215,12 +215,14 @@ function caretInfo(e) {
    =============================== */
 
 function findWord(text, cursor) {
+  console.log("findWord(text): ", text); // doesn't appear to break up text via sentences Thai style(spaces!!) so text is just a giant paragraph.
   for (let len = MAX_WORD_LEN; len >= 2; len--) {
     const end = cursor + len;
     if (end > text.length) continue;
     
     const word = text.slice(cursor, end);
     const entry = DICT[word];
+    if (entry) console.log("entry: ", entry); // check match
     if (entry) return { word, entry, start: cursor, end };
   }
   return null;

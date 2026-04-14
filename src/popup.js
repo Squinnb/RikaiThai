@@ -1,4 +1,4 @@
-const THEMES = ["Thai Flag", "midnight", "high-contrast"];
+const THEMES = ["solar", "midnight", "terminal"];
 
 function setActive(theme) {
   document.querySelectorAll(".theme-btn").forEach(btn => {
