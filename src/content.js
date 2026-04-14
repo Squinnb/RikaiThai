@@ -15,6 +15,7 @@ let tooltipHideTimer = null;
 let isHoveringTooltip = false;
 
 let activeMatch = null; // { start, end, word }
+const thaiSegmenter = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter("th", { granularity: "word" }) : null;
 
 const THEMES = {
   "solar": {
@@ -201,21 +202,73 @@ function caretInfo(e) {
 }
 
 /* ===============================
-   MATCHER (FIXED)
+   MATCHER (Intl.segmenter to segment -> dict to look up)
    =============================== */
 
 function findWord(text, cursor) {
-  console.log("findWord(text): ", text); // doesn't appear to break up text via sentences Thai style(spaces!!) so text is just a giant paragraph.
   for (let len = MAX_WORD_LEN; len >= 2; len--) {
     const end = cursor + len;
     if (end > text.length) continue;
     
     const word = text.slice(cursor, end);
     const entry = DICT[word];
-    if (entry) console.log("entry: ", entry); // check match
     if (entry) return { word, entry, start: cursor, end };
   }
   return null;
+}
+
+function findWordSmart(text, offset) {
+  if (!thaiSegmenter) return findWord(text, offset); // fallback for broswers w/out Intl
+  // FindWordSmart uses the thaiSegmenter to segment the full textnode
+  const segments = [...thaiSegmenter.segment(text)];
+
+  // find segment index under cursor
+  const i = segments.findIndex(seg => {
+    const start = seg.index;
+    const end = start + seg.segment.length;
+    return offset >= start && offset < end;
+  });
+
+  if (i === -1) return null;
+
+  // try combining segments, example:
+  const MAX_COMBINE = 3;
+
+  for (let len = MAX_COMBINE; len >= 1; len--) {
+    const slice = segments.slice(i, i + len);
+    const word = slice.map(s => s.segment).join("");
+
+    if (DICT[word]) {
+      return {
+        word,
+        entry: DICT[word],
+        start: slice[0].index,
+        end: slice[slice.length - 1].index + slice[slice.length - 1].segment.length
+      };
+    }
+  }
+
+  // Fallback: just return the segment (even if not in dict)
+  // TODO: think of graceful fail scenario for UI
+  const seg = segments[i];
+  // fallback to your old dictionary matcher INSIDE the segment
+  const fallback = findWord(seg.segment, 0);
+  // Fallback handles cases like ประเทศไทย. ประเทศไทย as a whole not in the dict but ประเทศ and ไทย both are so we pass findWord just the segment ประเทศไทย and it should return ประเทศ and then ไทย
+
+  if (fallback) {
+    return {
+      word: fallback.word,
+      entry: fallback.entry,
+      start: seg.index + fallback.start,
+      end: seg.index + fallback.end
+    };
+  }
+  return {
+    word: seg.segment,
+    entry: null,
+    start: seg.index,
+    end: seg.index + seg.segment.length
+  };
 }
 
 
@@ -315,7 +368,7 @@ function onMove(e) {
     return;
   }
 
-  const match = findWord(info.text, info.offset);
+  const match = findWordSmart(info.text, info.offset);
   if (!match) {
     if (isHoveringTooltip) return;
     scheduleClearHighlight();
@@ -329,7 +382,15 @@ function onMove(e) {
   };
 
   const wordRect = drawHighlight(info.node, match.start, match.end);
-  renderTooltip(match.word, match.entry);
+  if (match.entry) {
+    renderTooltip(match.word, match.entry);
+  } else {
+    renderTooltip(match.word, {
+      pos: ["unknown"], // assumes pos is a array of Strings elsewhere
+      romanization_paiboon: "",
+      senses: [{ gloss: "(no definition found)" }]
+    });
+  }
   const gap = 6;
   const viewportPadding = 8;
   const vw = window.innerWidth;
