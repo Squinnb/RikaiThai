@@ -14,11 +14,15 @@ const TOOLTIP_HIDE_DELAY_MS = 320;
 let tooltipHideTimer = null;
 let isHoveringTooltip = false;
 
-let activeMatch = null; // { start, end, word }
-const thaiSegmenter = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter("th", { granularity: "word" }) : null;
+let activeMatch = null;
+
+const thaiSegmenter =
+  typeof Intl !== "undefined" && Intl.Segmenter
+    ? new Intl.Segmenter("th", { granularity: "word" })
+    : null;
 
 const THEMES = {
-  "solar": {
+  solar: {
     background: "#fdf6e3",
     border: "#cb4b16",
     word: "#268bd2",
@@ -32,7 +36,7 @@ const THEMES = {
     pos: "#7a7a9a",
     text: "#c8c8e8",
   },
-  "terminal": {
+  terminal: {
     background: "#000000",
     border: "#00ba6adf",
     word: "#00ba6adf",
@@ -41,7 +45,7 @@ const THEMES = {
   },
 };
 
-let currentTheme = THEMES["midnight"]; // default
+let currentTheme = THEMES["midnight"];
 
 /* ===============================
    TOOLTIP
@@ -55,12 +59,9 @@ tooltip.style.zIndex = "2147483647";
 tooltip.style.borderRadius = "6px";
 tooltip.style.padding = "8px";
 tooltip.style.fontSize = "16px";
-tooltip.style.fontFamily = "'Noto Serif Thai', 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', 'Tahoma', serif";
-tooltip.style.fontFeatureSettings = "'liga' 1, 'kern' 1";
+tooltip.style.fontFamily =
+  "'Noto Serif Thai', 'TH Sarabun New', 'Sarabun', 'Leelawadee UI', 'Tahoma', serif";
 tooltip.style.lineHeight = "1.35";
-tooltip.style.letterSpacing = "normal";
-tooltip.style.wordSpacing = "normal";
-tooltip.style.whiteSpace = "normal";
 tooltip.style.pointerEvents = "auto";
 tooltip.style.userSelect = "text";
 tooltip.style.display = "none";
@@ -69,10 +70,7 @@ document.body.appendChild(tooltip);
 
 tooltip.addEventListener("mouseenter", () => {
   isHoveringTooltip = true;
-  if (tooltipHideTimer) {
-    clearTimeout(tooltipHideTimer);
-    tooltipHideTimer = null;
-  }
+  if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
 });
 
 tooltip.addEventListener("mouseleave", () => {
@@ -88,20 +86,16 @@ function applyTheme(t) {
   tooltip.style.color = theme.text;
 }
 
-// Load saved theme
 chrome.storage.sync.get("theme", ({ theme }) => {
   applyTheme(theme || "midnight");
 });
 
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.theme) {
-    applyTheme(changes.theme.newValue);
-  }
+  if (changes.theme) applyTheme(changes.theme.newValue);
 });
 
-
 /* ===============================
-   OVERLAY HIGHLIGHT
+   HIGHLIGHT
    =============================== */
 
 const highlight = document.createElement("div");
@@ -130,10 +124,6 @@ function drawHighlight(node, start, end) {
   return rect;
 }
 
-function pointInRect(x, y, rect) {
-  return !!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-}
-
 function scheduleClearHighlight() {
   if (tooltipHideTimer) return;
   tooltipHideTimer = setTimeout(() => {
@@ -142,178 +132,168 @@ function scheduleClearHighlight() {
   }, TOOLTIP_HIDE_DELAY_MS);
 }
 
-function cancelClearHighlight() {
-  if (!tooltipHideTimer) return;
-  clearTimeout(tooltipHideTimer);
-  tooltipHideTimer = null;
-}
-
 function clearHighlight() {
-  cancelClearHighlight();
   highlight.style.display = "none";
   tooltip.style.display = "none";
   activeMatch = null;
 }
 
 /* ===============================
-   CARET DETECTION
+   CARET
    =============================== */
 
 function caretInfo(e) {
-  let node = null, offset = 0;
+  let node = null,
+    offset = 0;
 
-  // Primary method
   if (document.caretPositionFromPoint) {
     const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
-    if (pos && pos.offsetNode.nodeType === 3) {
+    if (pos?.offsetNode?.nodeType === 3) {
       node = pos.offsetNode;
       offset = pos.offset;
     }
   }
 
-  // Fallback: caretRangeFromPoint (Chrome's native method)
   if (!node && document.caretRangeFromPoint) {
     const r = document.caretRangeFromPoint(e.clientX, e.clientY);
-    if (r && r.startContainer.nodeType === 3) {
+    if (r?.startContainer?.nodeType === 3) {
       node = r.startContainer;
       offset = r.startOffset;
     }
   }
 
-  // Last resort: walk into the element under cursor and find a Thai text node
-  if (!node) {
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (el) {
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-      let textNode;
-      while ((textNode = walker.nextNode())) {
-        if (/[\u0E00-\u0E7F]/.test(textNode.nodeValue)) {
-          node = textNode;
-          offset = 0; // imprecise but better than nothing
-          break;
-        }
-      }
-    }
-  }
-
-  if (!node || !/[\u0E00-\u0E7F]/.test(node.nodeValue)) return null;
+  if (!node) return null;
+  if (!THAI_CHAR_RE.test(node.nodeValue)) return null;
 
   return { node, text: node.nodeValue, offset };
 }
 
 /* ===============================
-   MATCHER (Intl.segmenter to segment -> dict to look up)
+   WORD RESOLUTION (CORE)
    =============================== */
 
-function findWord(text, cursor) {
-  for (let len = MAX_WORD_LEN; len >= 2; len--) {
-    const end = cursor + len;
-    if (end > text.length) continue;
-    
-    const word = text.slice(cursor, end);
-    const entry = DICT[word];
-    if (entry) return { word, entry, start: cursor, end };
+function resolveSegment(segment) {
+  const tokens = [];
+
+  // full match
+  if (DICT[segment]) {
+    tokens.push({ word: segment, entry: DICT[segment] });
   }
-  return null;
+
+  // decompose
+  let i = 0;
+  const parts = [];
+
+  while (i < segment.length) {
+    let found = null;
+
+    for (let len = Math.min(MAX_WORD_LEN, segment.length - i); len >= 1; len--) {
+      const sub = segment.slice(i, i + len);
+      if (DICT[sub]) {
+        found = sub;
+        parts.push({ word: sub, entry: DICT[sub] });
+        i += len;
+        break;
+      }
+    }
+
+    if (!found) i++;
+  }
+
+  if (!(parts.length === 1 && parts[0].word === segment)) {
+    tokens.push(...parts);
+  }
+
+  if (tokens.length === 0) {
+    tokens.push({
+      word: segment,
+      entry: {
+        pos: ["unknown"],
+        romanization_paiboon: "",
+        senses: [{ gloss: "(no definition found)" }],
+      },
+    });
+  }
+
+  return tokens;
 }
 
+/* ===============================
+   MATCHER
+   =============================== */
+
 function findWordSmart(text, offset) {
-  if (!thaiSegmenter) return findWord(text, offset); // fallback for broswers w/out Intl
-  // FindWordSmart uses the thaiSegmenter to segment the full textnode
+  if (!thaiSegmenter) return null;
+
   const segments = [...thaiSegmenter.segment(text)];
 
-  // find segment index under cursor
-  const i = segments.findIndex(seg => {
-    const start = seg.index;
-    const end = start + seg.segment.length;
+  const seg = segments.find((s) => {
+    const start = s.index;
+    const end = start + s.segment.length;
     return offset >= start && offset < end;
   });
 
-  if (i === -1) return null;
+  if (!seg) return null;
 
-  // try combining segments, example:
-  const MAX_COMBINE = 3;
-
-  for (let len = MAX_COMBINE; len >= 1; len--) {
-    const slice = segments.slice(i, i + len);
-    const word = slice.map(s => s.segment).join("");
-
-    if (DICT[word]) {
-      return {
-        word,
-        entry: DICT[word],
-        start: slice[0].index,
-        end: slice[slice.length - 1].index + slice[slice.length - 1].segment.length
-      };
-    }
-  }
-
-  // Fallback: just return the segment (even if not in dict)
-  // TODO: think of graceful fail scenario for UI
-  const seg = segments[i];
-  // fallback to your old dictionary matcher INSIDE the segment
-  const fallback = findWord(seg.segment, 0);
-  // Fallback handles cases like ประเทศไทย. ประเทศไทย as a whole not in the dict but ประเทศ and ไทย both are so we pass findWord just the segment ประเทศไทย and it should return ประเทศ and then ไทย
-
-  if (fallback) {
-    return {
-      word: fallback.word,
-      entry: fallback.entry,
-      start: seg.index + fallback.start,
-      end: seg.index + fallback.end
-    };
-  }
   return {
-    word: seg.segment,
-    entry: null,
+    tokens: resolveSegment(seg.segment),
     start: seg.index,
-    end: seg.index + seg.segment.length
+    end: seg.index + seg.segment.length,
   };
 }
 
-
 /* ===============================
-   TOOLTIP UI
+   TOOLTIP RENDER
    =============================== */
 
-function renderTooltip(word, entry) {
-  const posText = entry.pos.join(", ");
-  const roman = entry.romanization_paiboon || "";
-  const senses = entry.senses;
+function renderTooltip(tokens) {
+  let html = "";
 
-  let html = `
-    <div style="font-family:inherit;display:block;margin:0;padding:0;font-size:28px;line-height:1.2;font-weight:bold;color:${currentTheme.word};">
-      ${word}
-    </div>
-    <div style="font-family:inherit;display:block;margin:2px 0 6px 0;padding:0;font-size:15px;line-height:1.25;opacity:0.85;">
-      ${roman}
-    </div>
-    <div style="font-family:inherit;display:block;margin:0 0 4px 0;padding:0;font-size:12px;line-height:1.25;color:${currentTheme.pos};">
-      ${posText}
-    </div>
-  `;
+  tokens.forEach((item, idx) => {
+    const { word, entry } = item;
 
-  senses.forEach((sense, idx) => {
-    if (!sense || !sense.gloss) return;
-    const registerText = sense.register && sense.register.length
-      ? ` <span style="font-family:inherit;opacity:0.8;color:${currentTheme.pos};">(${sense.register.join(", ")})</span>`
-      : "";
-    html += `<div style="font-family:inherit;display:block;margin:4px 0 0 0;padding:0;font-size:14px;line-height:1.35;">
-      <span style="font-size:11px;opacity:0.75;color:${currentTheme.pos};margin-right:4px;">${idx + 1}.</span>
-      ${sense.gloss}${registerText}
-    </div>`;
+    const posText = entry.pos?.join(", ") || "";
+    const roman = entry.romanization_paiboon || "";
+    const senses = entry.senses || [];
+
+    if (idx > 0) {
+      html += `<div style="margin-top:6px;border-top:1px solid ${currentTheme.border};opacity:0.3;"></div>`;
+    }
+
+    html += `
+      <div style="font-size:24px;font-weight:bold;color:${currentTheme.word};margin-top:4px;">
+        ${word}
+      </div>
+      <div style="font-size:14px;opacity:0.85;">
+        ${roman}
+      </div>
+      <div style="font-size:12px;color:${currentTheme.pos};margin-bottom:4px;">
+        ${posText}
+      </div>
+    `;
+
+    senses.forEach((sense, i) => {
+      if (!sense?.gloss) return;
+
+      html += `
+        <div style="font-size:14px;line-height:1.35;">
+          <span style="font-size:11px;opacity:0.7;margin-right:4px;">${i + 1}.</span>
+          ${sense.gloss}
+        </div>
+      `;
+    });
   });
 
   tooltip.innerHTML = html;
 }
 
 /* ===============================
-   MOUSE HANDLER
+   MOUSE
    =============================== */
 
 function hasDirectThaiText(el) {
   for (const node of el.childNodes) {
-    if (node.nodeType === 3 && /[\u0E00-\u0E7F]/.test(node.nodeValue)) {
+    if (node.nodeType === 3 && THAI_CHAR_RE.test(node.nodeValue)) {
       return true;
     }
   }
@@ -326,39 +306,18 @@ chrome.storage.sync.get("enabled", ({ enabled }) => {
   isEnabled = enabled !== false;
 });
 
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.theme) applyTheme(changes.theme.newValue);
-  if (changes.enabled) {
-    isEnabled = changes.enabled.newValue;
-    if (!isEnabled) clearHighlight();
-  }
-});
-
 function onMove(e) {
   if (!DICT || !isEnabled) return;
-  cancelClearHighlight();
 
-  if (tooltip.style.display === "block") {
-    const tooltipRect = tooltip.getBoundingClientRect();
-    if (pointInRect(e.clientX, e.clientY, tooltipRect)) return;
-  }
-
-  // Quick bail: no Thai text in the element under cursor
   const el = document.elementFromPoint(e.clientX, e.clientY);
   if (!el || !hasDirectThaiText(el)) {
-    if (isHoveringTooltip) return;
     scheduleClearHighlight();
     return;
   }
 
   const info = caretInfo(e);
-  if (!info || !/[\u0E00-\u0E7F]/.test(info.text)) {
-    if (isHoveringTooltip) return;
-    scheduleClearHighlight();
-    return;
-  }
+  if (!info) return;
 
-  // If cursor still inside active word, do nothing
   if (
     activeMatch &&
     info.node === activeMatch.node &&
@@ -369,65 +328,43 @@ function onMove(e) {
   }
 
   const match = findWordSmart(info.text, info.offset);
-  if (!match) {
-    if (isHoveringTooltip) return;
-    scheduleClearHighlight();
-    return;
-  }
+  if (!match) return;
 
   activeMatch = {
     node: info.node,
     start: match.start,
-    end: match.end
+    end: match.end,
   };
 
-  const wordRect = drawHighlight(info.node, match.start, match.end);
-  if (match.entry) {
-    renderTooltip(match.word, match.entry);
-  } else {
-    renderTooltip(match.word, {
-      pos: ["unknown"], // assumes pos is a array of Strings elsewhere
-      romanization_paiboon: "",
-      senses: [{ gloss: "(no definition found)" }]
-    });
-  }
+  const rect = drawHighlight(info.node, match.start, match.end);
+
+  renderTooltip(match.tokens);
+
+  tooltip.style.display = "block";
+
   const gap = 6;
-  const viewportPadding = 8;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
-  // Measure first, then place to avoid clipping off-screen.
-  tooltip.style.visibility = "hidden";
-  tooltip.style.display = "block";
-
   const tooltipRect = tooltip.getBoundingClientRect();
-  const anchorX = wordRect ? wordRect.left + (wordRect.width / 2) : e.clientX;
-  const anchorYTop = wordRect ? wordRect.top : e.clientY;
-  const anchorYBottom = wordRect ? wordRect.bottom : e.clientY;
 
-  let left = anchorX + gap;
-  let top = anchorYBottom + gap;
+  let left = rect.left + gap;
+  let top = rect.bottom + gap;
 
-  // Flip horizontally if overflowing right edge.
-  if (left + tooltipRect.width + viewportPadding > vw) {
-    left = anchorX - tooltipRect.width - gap;
-  }
-  // Flip vertically if overflowing bottom edge.
-  if (top + tooltipRect.height + viewportPadding > vh) {
-    top = anchorYTop - tooltipRect.height - gap;
+  if (left + tooltipRect.width > vw) {
+    left = rect.left - tooltipRect.width - gap;
   }
 
-  // Clamp into viewport as final safety.
-  left = Math.max(viewportPadding, Math.min(left, vw - tooltipRect.width - viewportPadding));
-  top = Math.max(viewportPadding, Math.min(top, vh - tooltipRect.height - viewportPadding));
+  if (top + tooltipRect.height > vh) {
+    top = rect.top - tooltipRect.height - gap;
+  }
 
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${top}px`;
-  tooltip.style.visibility = "visible";
 }
 
 /* ===============================
-   LOAD DICT
+   LOAD
    =============================== */
 
 async function loadDict() {
@@ -435,8 +372,7 @@ async function loadDict() {
   const json = await res.json();
   DICT = json._data;
 
-  MAX_WORD_LEN = Math.max(...Object.keys(DICT).map(w => [...w].length));
-  console.log("Thai dict loaded:", Object.keys(DICT).length);
+  MAX_WORD_LEN = Math.max(...Object.keys(DICT).map((w) => [...w].length));
 }
 
 /* ===============================
