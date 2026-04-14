@@ -1,5 +1,5 @@
 /* global chrome */
-console.log("Thai Dictionary Extension loaded");
+console.log("Khao Jai Thai Dictionary Extension loaded");
 
 /* ===============================
    GLOBALS
@@ -46,6 +46,7 @@ const THEMES = {
 };
 
 let currentTheme = THEMES["midnight"];
+
 
 /* ===============================
    TOOLTIP
@@ -169,6 +170,22 @@ function caretInfo(e) {
 }
 
 /* ===============================
+    MEANINGFUL FILTER
+   =============================== */
+
+function isMeaningfulEntry(entry, word, segmentLength) {
+  if (!entry) return false;
+
+  // Reject single-char matches inside longer words
+  if (segmentLength > 1 && word.length === 1) return false;
+
+  // Reject character entries inside longer words
+  if (segmentLength > 1 && entry.pos?.includes("character")) return false;
+
+  return true;
+}
+
+/* ===============================
    WORD RESOLUTION (CORE)
    =============================== */
 
@@ -200,6 +217,27 @@ function resolveSegment(segment) {
     if (!found) i++;
   }
 
+  /* ===============================
+      FILTER JUNK DECOMPOSITIONS
+     =============================== */
+
+  const hasJunk =
+    segment.length > 1 &&
+    parts.some((p) => !isMeaningfulEntry(p.entry, p.word, segment.length));
+
+  if (hasJunk) {
+    return [
+      {
+        word: segment,
+        entry: {
+          pos: ["unknown"],
+          romanization_paiboon: "",
+          senses: [{ gloss: "(no definition found)" }],
+        },
+      },
+    ];
+  }
+
   if (!(parts.length === 1 && parts[0].word === segment)) {
     tokens.push(...parts);
   }
@@ -222,25 +260,51 @@ function resolveSegment(segment) {
    MATCHER
    =============================== */
 
-function findWordSmart(text, offset) {
-  if (!thaiSegmenter) return null;
+   function findWordSmart(text, offset) {
+    if (!thaiSegmenter) return null;
+  
+    const segments = [...thaiSegmenter.segment(text)];
+  
+    const i = segments.findIndex((s) => {
+      const start = s.index;
+      const end = start + s.segment.length;
+      return offset >= start && offset < end;
+    });
+  
+    if (i === -1) return null;
+    
+    const seg = segments[i];
 
-  const segments = [...thaiSegmenter.segment(text)];
-
-  const seg = segments.find((s) => {
-    const start = s.index;
-    const end = start + s.segment.length;
-    return offset >= start && offset < end;
-  });
-
-  if (!seg) return null;
-
-  return {
-    tokens: resolveSegment(seg.segment),
-    start: seg.index,
-    end: seg.index + seg.segment.length,
-  };
-}
+    // Ignore non-Thai segments
+    if (!THAI_CHAR_RE.test(seg.segment)) {
+      return null;
+    }
+  
+    const MAX_COMBINE = 4;
+  
+    // Try catching commonly mistakenly segmented foreign words written in Thai(e.g. ควอลิฟาย, qualify). Only checks to the right of cursor segment, maybe add left in the future...
+    for (let len = MAX_COMBINE; len >= 1; len--) {
+      const slice = segments.slice(i, i + len);
+      const combined = slice.map((s) => s.segment).join("");
+  
+      if (DICT[combined]) {
+        return {
+          tokens: resolveSegment(combined),
+          start: slice[0].index,
+          end:
+            slice[slice.length - 1].index +
+            slice[slice.length - 1].segment.length,
+        };
+      }
+    }
+  
+  
+    return {
+      tokens: resolveSegment(seg.segment),
+      start: seg.index,
+      end: seg.index + seg.segment.length,
+    };
+  }
 
 /* ===============================
    TOOLTIP RENDER
