@@ -12,4 +12,4 @@ A rikaikun-inspired hover dictionary and word segmenter for Thai text — hover 
 
 <img width="921" height="517" alt="kjt" src="https://github.com/user-attachments/assets/13f26fca-5fe3-474e-a5d2-b1605c3f5c96" />
 
-<img width="300" height="316" alt="Screenshot 2026-04-08 at 11 27 25 PM" src="https://github.com/user-attachments/assets/6dee2b1d-854d-498e-9007-2df027a4d4c3" />
+<img width="301" height="313" alt="Screenshot 2026-04-14 at 10 00 51 PM" src="https://github.com/user-attachments/assets/48517aab-d512-4401-bfea-db78b6f66e66" />
