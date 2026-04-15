@@ -5,6 +5,11 @@
     "description": "Hover over Thai text to translate กินข้าวไหน",
     "permissions": ["scripting", "activeTab", "storage"],
     "host_permissions": ["<all_urls>"],
+    "icons": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
     "action": {
       "default_popup": "index.html",
       "default_icon": "icon.png"
