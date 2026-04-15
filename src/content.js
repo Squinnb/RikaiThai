@@ -9,7 +9,8 @@ const DICT_PATH = "enhanced_thai_dict.json";
 let DICT = null;
 let MAX_WORD_LEN = 0;
 const THAI_CHAR_RE = /[\u0E00-\u0E7F]/;
-
+let hoverTimer = null;
+const HOVER_DELAY_MS = 10; // tweak: 30–80ms range
 const TOOLTIP_HIDE_DELAY_MS = 150;
 let tooltipHideTimer = null;
 
@@ -125,6 +126,10 @@ function scheduleClearHighlight() {
 }
 
 function clearHighlight() {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+  }
   highlight.style.display = "none";
   tooltip.style.display = "none";
   activeMatch = null;
@@ -398,6 +403,17 @@ function onMove(e) {
     return;
   }
 
+  // activeMatch = {
+  //   node: info.node,
+  //   start: match.start,
+  //   end: match.end,
+  // };
+  // const rect = drawHighlight(info.node, match.start, match.end);
+  // renderTooltip(match.tokens);
+  // tooltip.style.display = "block";
+  if (hoverTimer) clearTimeout(hoverTimer);
+
+hoverTimer = setTimeout(() => {
   activeMatch = {
     node: info.node,
     start: match.start,
@@ -405,11 +421,10 @@ function onMove(e) {
   };
 
   const rect = drawHighlight(info.node, match.start, match.end);
+  if (!rect) return;
 
   renderTooltip(match.tokens);
-
   tooltip.style.display = "block";
-
   const gap = 6;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -429,6 +444,7 @@ function onMove(e) {
 
   tooltip.style.left = `${left}px`;
   tooltip.style.top = `${top}px`;
+  }, HOVER_DELAY_MS);
 }
 
 /* ===============================
