@@ -10,9 +10,9 @@ let DICT = null;
 let MAX_WORD_LEN = 0;
 const THAI_CHAR_RE = /[\u0E00-\u0E7F]/;
 
-const TOOLTIP_HIDE_DELAY_MS = 320;
+const TOOLTIP_HIDE_DELAY_MS = 150;
 let tooltipHideTimer = null;
-let isHoveringTooltip = false;
+
 
 let activeMatch = null;
 
@@ -69,15 +69,6 @@ tooltip.style.display = "none";
 tooltip.style.maxWidth = "360px";
 document.body.appendChild(tooltip);
 
-tooltip.addEventListener("mouseenter", () => {
-  isHoveringTooltip = true;
-  if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
-});
-
-tooltip.addEventListener("mouseleave", () => {
-  isHoveringTooltip = false;
-  scheduleClearHighlight();
-});
 
 function applyTheme(t) {
   const theme = THEMES[t] || THEMES["midnight"];
@@ -129,7 +120,7 @@ function scheduleClearHighlight() {
   if (tooltipHideTimer) return;
   tooltipHideTimer = setTimeout(() => {
     tooltipHideTimer = null;
-    if (!isHoveringTooltip) clearHighlight();
+    clearHighlight()
   }, TOOLTIP_HIDE_DELAY_MS);
 }
 
@@ -370,17 +361,27 @@ chrome.storage.sync.get("enabled", ({ enabled }) => {
   isEnabled = enabled !== false;
 });
 
+function cancelClearHighlight() {
+  if (!tooltipHideTimer) return;
+  clearTimeout(tooltipHideTimer);
+  tooltipHideTimer = null;
+}
+
 function onMove(e) {
   if (!DICT || !isEnabled) return;
+  cancelClearHighlight()
 
   const el = document.elementFromPoint(e.clientX, e.clientY);
   if (!el || !hasDirectThaiText(el)) {
-    scheduleClearHighlight();
+    clearHighlight()
     return;
   }
 
   const info = caretInfo(e);
-  if (!info) return;
+  if (!info) {
+    clearHighlight()
+    return;
+  }
 
   if (
     activeMatch &&
@@ -392,7 +393,10 @@ function onMove(e) {
   }
 
   const match = findWordSmart(info.text, info.offset);
-  if (!match) return;
+  if (!match) {
+    scheduleClearHighlight();
+    return;
+  }
 
   activeMatch = {
     node: info.node,
