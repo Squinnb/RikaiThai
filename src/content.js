@@ -1,5 +1,5 @@
 /* global chrome */
-console.log("Khao Jai Thai Dictionary Extension loaded");
+// console.log("Khao Jai Thai Dictionary Extension loaded");
 
 /* ===============================
    GLOBALS
