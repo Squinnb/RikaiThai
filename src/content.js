@@ -366,6 +366,12 @@ chrome.storage.sync.get("enabled", ({ enabled }) => {
   isEnabled = enabled !== false;
 });
 
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" && changes.enabled) {
+    isEnabled = changes.enabled.newValue !== false;
+  }
+});
+
 function cancelClearHighlight() {
   if (!tooltipHideTimer) return;
   clearTimeout(tooltipHideTimer);
