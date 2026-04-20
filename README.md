@@ -1,6 +1,6 @@
 # เข้าใจ Thai 🇹🇭
 
-A rikaikun-inspired hover dictionary and word segmenter for Thai text — hover over any Thai word on the web and instantly see its definition, romanization, and part of speech.
+A hover dictionary and word segmenter for Thai text — hover over any Thai word on the web and instantly see its definition, romanization, and part of speech.
 
 ## Features
 
