@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "khaojaithai",
     "version": "0.1",
-    "description": "Hover over Thai text to translate กินข้าวไหน",
+    "description": "Hover popup Thai to English dictionary for the browser",
     "permissions": ["storage"],
     "host_permissions": ["<all_urls>"],
     "icons": {
